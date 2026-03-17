@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Ash</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:      #13151F;
+      --panel:   #1C1F2E;
+      --panel2:  #222638;
+      --border:  #2E3248;
+      --border2: #3A3F58;
+      --amber:   #D4821A;
+      --amber2:  #F0A030;
+      --red:     #C03428;
+      --blue:    #2A70B8;
+      --teal:    #1E8888;
+      --green:   #2A8A52;
+      --white:   #F0EDE8;
+      --muted:   #6A7090;
+      --mid:     #9098B8;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Rajdhani',sans-serif; background:var(--bg); color:var(--white); min-height:100vh; display:flex; flex-direction:column; }
+
+    /* ─── NAV ─── */
+    nav {
+      position:relative; z-index:20;
+      background:var(--panel); border-bottom:1px solid var(--border);
+      display:flex; align-items:center; padding:0 40px; height:52px;
+    }
+    .nav-logo {
+      font-weight:700; font-size:0.95rem; letter-spacing:3px;
+      text-transform:uppercase; color:var(--white);
+      display:flex; align-items:center; gap:10px; margin-right:auto;
+    }
+    .nav-ball { width:20px; height:20px; flex-shrink:0; }
+    .nav-links { list-style:none; display:flex; }
+    .nav-links a {
+      display:block; padding:0 18px; height:52px; line-height:52px;
+      font-family:'JetBrains Mono',monospace; font-size:0.65rem;
+      letter-spacing:1.5px; text-transform:uppercase;
+      color:var(--muted); text-decoration:none;
+      border-bottom:2px solid transparent;
+      transition:color 0.15s, border-color 0.15s;
+      cursor:pointer;
+    }
+    .nav-links a:hover  { color:var(--mid); }
+    .nav-links a.active { color:var(--amber); border-bottom-color:var(--amber); }
+    .nav-status {
+      margin-left:28px; display:flex; align-items:center;
+      gap:7px; font-family:'JetBrains Mono',monospace; font-size:0.62rem;
+      color:var(--muted); letter-spacing:1px;
+    }
+    .live {
+      width:6px; height:6px; border-radius:50%;
+      background:var(--green); box-shadow:0 0 6px var(--green);
+      animation:blink 2.5s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ─── BANNER ─── */
+    .banner { width:100%; height:300px; position:relative; overflow:hidden; }
+    .banner img { width:100%; height:100%; object-fit:cover; object-position:center 22%; display:block; }
+    .banner::after {
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(to bottom, transparent 35%, rgba(19,21,31,.6) 75%, var(--bg) 100%);
+    }
+    .banner-border {
+      position:absolute; bottom:0; left:0; right:0; height:2px; z-index:2;
+      background:linear-gradient(90deg, var(--amber), var(--red) 30%, var(--blue) 65%, var(--teal));
+    }
+
+    /* ─── PAGES ─── */
+    .page { max-width:1100px; margin:0 auto; padding:0 36px 48px; flex:1; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+
+    /* ─── PROFILE ─── */
+    .profile {
+      display:flex; align-items:flex-end; gap:22px;
+      margin-top:-46px; margin-bottom:36px;
+      position:relative; z-index:5;
+    }
+    .avatar {
+      width:92px; height:92px; border-radius:50%; overflow:hidden;
+      border:2px solid var(--panel); outline:2px solid var(--amber);
+      outline-offset:2px; flex-shrink:0; box-shadow:0 4px 24px rgba(0,0,0,.5);
+    }
+    .avatar img { width:100%; height:100%; object-fit:cover; object-position:center 8%; }
+    .profile-text { flex:1; padding-bottom:4px; }
+    .profile-eyebrow { font-family:'JetBrains Mono',monospace; font-size:.58rem; letter-spacing:2px; color:var(--amber); margin-bottom:3px; }
+    .profile-name { font-weight:700; font-size:2.3rem; letter-spacing:2px; text-transform:uppercase; line-height:1; color:var(--white); }
+    .profile-name span { color:var(--amber); }
+    .profile-sub { font-size:.82rem; color:var(--muted); font-weight:400; margin-top:5px; }
+    .profile-tags { display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; }
+    .tag {
+      display:inline-flex; align-items:center; gap:5px;
+      font-family:'JetBrains Mono',monospace; font-size:.6rem; letter-spacing:.8px;
+      padding:4px 10px; border:1px solid var(--border2);
+      background:var(--panel2); color:var(--muted);
+      cursor:pointer; border-radius:3px; transition:border-color .15s, color .15s;
+    }
+    .tag:hover { border-color:var(--amber); color:var(--amber); }
+    .tag .tdot { width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 4px var(--green); }
+    .tag.t-green { border-color:rgba(42,138,82,.4); color:var(--green); }
+    .tag.t-blue  { border-color:rgba(42,112,184,.4); color:var(--blue); }
+    .profile-worth { text-align:right; padding-bottom:6px; }
+    .worth-label { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+    .worth-val { font-weight:700; font-size:2rem; color:var(--white); letter-spacing:1px; margin-top:2px; }
+    .worth-change { font-family:'JetBrains Mono',monospace; font-size:.6rem; color:var(--green); margin-top:3px; }
+
+    /* ─── DIVIDER / SECTION ─── */
+    .divider { border:none; border-top:1px solid var(--border); margin-bottom:28px; }
+    .sec { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+    .sec-label { font-family:'JetBrains Mono',monospace; font-size:.58rem; letter-spacing:2px; color:var(--muted); text-transform:uppercase; white-space:nowrap; }
+    .sec-line  { flex:1; height:1px; background:var(--border); }
+    .sec-tag   { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--amber); letter-spacing:1px; }
+
+    /* ─── METRICS ─── */
+    .metrics {
+      display:grid; grid-template-columns:repeat(5,1fr);
+      background:var(--panel); border:1px solid var(--border);
+      border-radius:6px; overflow:hidden; margin-bottom:28px; position:relative;
+    }
+    .metrics::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--amber); }
+    .metric { padding:20px 18px; border-right:1px solid var(--border); transition:background .15s; }
+    .metric:last-child { border-right:none; }
+    .metric:hover { background:rgba(212,130,26,.06); }
+    .metric-id { font-family:'JetBrains Mono',monospace; font-size:.52rem; color:var(--amber); letter-spacing:1.5px; opacity:.7; margin-bottom:8px; }
+    .metric-val { font-weight:700; font-size:1.5rem; letter-spacing:.5px; line-height:1; color:var(--white); }
+    .metric-val.amber { color:var(--amber); }
+    .metric-val.blue  { color:var(--blue); }
+    .metric-val.green { color:var(--green); }
+    .metric-name { font-size:.72rem; font-weight:500; color:var(--muted); margin-top:5px; }
+    .metric-sub  { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); margin-top:3px; }
+    .metric-sub.up { color:var(--green); }
+
+    /* ─── TABLE ─── */
+    .table-box {
+      background:var(--panel); border:1px solid var(--border);
+      border-radius:6px; overflow:hidden; margin-bottom:32px;
+      border-left:2px solid var(--blue);
+    }
+    table { width:100%; border-collapse:collapse; }
+    thead tr { background:var(--panel2); border-bottom:1px solid var(--border); }
+    th { padding:11px 20px; font-family:'JetBrains Mono',monospace; font-size:.56rem; letter-spacing:2px; color:var(--muted); text-align:left; font-weight:400; }
+    th:not(:first-child) { text-align:right; }
+    td { padding:14px 20px; font-size:.85rem; font-weight:500; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--mid); }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:rgba(212,130,26,.04); }
+    .asset-cell { display:flex; align-items:center; gap:12px; }
+    .a-icon { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; font-family:'JetBrains Mono',monospace; font-size:.56rem; font-weight:500; color:var(--white); flex-shrink:0; }
+    .a-eth  { background:#4F63D2; }
+    .a-usdc { background:#2775CA; }
+    .a-base { background:#0052FF; }
+    .a-name { font-weight:600; color:var(--white); font-size:.88rem; }
+    .a-net  { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); letter-spacing:1px; margin-top:1px; }
+    td.r   { text-align:right; }
+    td.val { text-align:right; font-weight:600; color:var(--white); }
+    td.up  { text-align:right; color:var(--green);  font-family:'JetBrains Mono',monospace; font-size:.75rem; }
+    td.na  { text-align:right; color:var(--border2); font-family:'JetBrains Mono',monospace; font-size:.75rem; }
+    .table-foot { padding:13px 20px; background:var(--panel2); border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+    .tf-l { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); letter-spacing:1.5px; }
+    .tf-r { font-size:1.05rem; font-weight:700; color:var(--white); }
+
+    /* ─── CARD GRID ─── */
+    .card-grid {
+      display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr));
+      gap:16px; margin-bottom:20px;
+    }
+    .p-card {
+      background:var(--panel); border:1px solid var(--border);
+      border-radius:8px; overflow:hidden; cursor:pointer; position:relative;
+      transition:transform .2s, border-color .2s, box-shadow .2s;
+    }
+    .p-card::before {
+      content:''; position:absolute; top:5px; left:5px;
+      width:10px; height:10px;
+      border-top:1.5px solid var(--amber); border-left:1.5px solid var(--amber);
+      z-index:2; pointer-events:none;
+    }
+    .p-card::after {
+      content:''; position:absolute; top:5px; right:5px;
+      width:10px; height:10px;
+      border-top:1.5px solid var(--amber); border-right:1.5px solid var(--amber);
+      z-index:2; pointer-events:none;
+    }
+    .p-card:hover {
+      transform:translateY(-6px);
+      border-color:var(--amber);
+      box-shadow:0 12px 36px rgba(0,0,0,.5), 0 0 0 1px var(--amber);
+    }
+    .p-card-media { width:100%; aspect-ratio:3/4; display:block; object-fit:cover; background:var(--panel2); }
+    .p-card-media-wrap { position:relative; overflow:hidden; }
+    .play-hint {
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; transition:opacity .2s; background:rgba(0,0,0,.2);
+    }
+    .p-card:hover .play-hint { opacity:1; }
+    .play-hint svg { width:36px; height:36px; opacity:.85; }
+    .p-card-body { padding:12px 14px 14px; border-top:1px solid var(--border); }
+    .p-card-grade {
+      display:inline-flex; align-items:center; gap:5px;
+      font-family:'JetBrains Mono',monospace; font-size:.52rem;
+      letter-spacing:1px; text-transform:uppercase; padding:2px 8px;
+      border-radius:2px; background:rgba(212,130,26,.12);
+      border:1px solid rgba(212,130,26,.4); color:var(--amber); margin-bottom:6px;
+    }
+    .p-card-name {
+      font-weight:700; font-size:.82rem; color:var(--white); line-height:1.3;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    }
+    .p-card-value { font-weight:700; font-size:1.05rem; color:var(--amber); margin-top:8px; }
+
+    /* ─── COLLECTION TOTAL BAR ─── */
+    .coll-bar {
+      background:var(--panel); border:1px solid var(--border);
+      border-left:2px solid var(--amber); border-radius:4px;
+      padding:16px 22px; display:flex; justify-content:space-between; align-items:center;
+    }
+    .cb-label { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+    .cb-sub   { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); margin-top:3px; }
+    .cb-val   { font-weight:700; font-size:1.5rem; color:var(--amber); letter-spacing:1px; }
+
+    /* ─── ACTIVITY ─── */
+    .activity-list { display:flex; flex-direction:column; gap:1px; }
+
+    .act-item {
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:6px;
+      padding:16px 20px;
+      display:grid;
+      grid-template-columns:40px 1fr auto;
+      align-items:center;
+      gap:16px;
+      transition:background .15s;
+    }
+    .act-item:hover { background:var(--panel2); }
+
+    .act-icon {
+      width:38px; height:38px;
+      border-radius:50%;
+      display:grid; place-items:center;
+      flex-shrink:0;
+    }
+    .act-icon.buy    { background:rgba(42,138,82,.15);  border:1px solid rgba(42,138,82,.3); }
+    .act-icon.sell   { background:rgba(192,52,40,.15);  border:1px solid rgba(192,52,40,.3); }
+    .act-icon.receive{ background:rgba(42,112,184,.15); border:1px solid rgba(42,112,184,.3); }
+    .act-icon.send   { background:rgba(192,52,40,.15);  border:1px solid rgba(192,52,40,.3); }
+    .act-icon svg    { width:16px; height:16px; }
+
+    .act-body { min-width:0; }
+    .act-title { font-weight:600; font-size:.9rem; color:var(--white); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .act-meta  { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); margin-top:3px; }
+
+    .act-right { text-align:right; flex-shrink:0; }
+    .act-amount { font-weight:700; font-size:1rem; }
+    .act-amount.green  { color:var(--green); }
+    .act-amount.red    { color:var(--red); }
+    .act-amount.amber  { color:var(--amber); }
+    .act-date  { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); margin-top:3px; }
+
+    .act-hash {
+      display:inline-flex; align-items:center; gap:4px;
+      font-family:'JetBrains Mono',monospace; font-size:.56rem;
+      color:var(--blue); text-decoration:none;
+      transition:color .15s;
+    }
+    .act-hash:hover { color:var(--amber); }
+
+    /* Activity filter pills */
+    .act-filters {
+      display:flex; gap:8px; margin-bottom:16px;
+    }
+    .act-filter {
+      font-family:'JetBrains Mono',monospace; font-size:.6rem;
+      letter-spacing:1px; text-transform:uppercase;
+      padding:4px 12px; border-radius:3px;
+      border:1px solid var(--border2); background:transparent;
+      color:var(--muted); cursor:pointer;
+      transition:all .15s;
+    }
+    .act-filter:hover  { border-color:var(--amber); color:var(--amber); }
+    .act-filter.active { background:rgba(212,130,26,.15); border-color:var(--amber); color:var(--amber); }
+
+    /* Collection header page */
+    .collection-stats {
+      display:grid; grid-template-columns:repeat(3,1fr);
+      gap:12px; margin-bottom:28px;
+    }
+    .cstat {
+      background:var(--panel); border:1px solid var(--border);
+      border-radius:6px; padding:18px 20px; position:relative;
+    }
+    .cstat::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--amber); border-radius:6px 6px 0 0; }
+    .cstat-label { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:6px; }
+    .cstat-val   { font-weight:700; font-size:1.4rem; color:var(--white); }
+    .cstat-val.amber { color:var(--amber); }
+
+    /* ─── DETAIL PANEL ─── */
+    .detail-overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(10,12,20,.7); z-index:200; backdrop-filter:blur(4px);
+    }
+    .detail-overlay.open { display:block; }
+    .detail-panel {
+      position:fixed; top:0; right:0; bottom:0;
+      width:480px; max-width:95vw;
+      background:var(--panel); border-left:1px solid var(--border2);
+      z-index:201; display:flex; flex-direction:column;
+      transform:translateX(100%);
+      transition:transform .3s cubic-bezier(.4,0,.2,1); overflow:hidden;
+    }
+    .detail-panel.open { transform:translateX(0); }
+    .detail-panel::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--amber); z-index:1; }
+    .detail-close {
+      position:absolute; top:16px; right:16px;
+      background:var(--panel2); border:1px solid var(--border2);
+      border-radius:50%; width:32px; height:32px;
+      font-size:1.1rem; cursor:pointer; color:var(--muted);
+      display:grid; place-items:center; z-index:2;
+      transition:background .15s, color .15s;
+    }
+    .detail-close:hover { background:var(--border2); color:var(--white); }
+    .detail-media { flex-shrink:0; background:var(--panel2); position:relative; aspect-ratio:1; overflow:hidden; }
+    .detail-media video,
+    .detail-media img { width:100%; height:100%; object-fit:contain; display:none; }
+    .detail-media video.active,
+    .detail-media img.active { display:block; }
+    .media-tabs-bar { display:flex; gap:6px; justify-content:center; padding:10px; background:var(--panel2); flex-shrink:0; }
+    .media-tab { width:28px; height:4px; border-radius:2px; background:rgba(255,255,255,.2); cursor:pointer; border:none; padding:0; transition:background .15s; }
+    .media-tab.active { background:var(--amber); }
+    .detail-info { flex:1; overflow-y:auto; padding:24px; }
+    .detail-info::-webkit-scrollbar { width:4px; }
+    .detail-info::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+    .detail-eyebrow { font-family:'JetBrains Mono',monospace; font-size:.55rem; color:var(--amber); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px; }
+    .detail-title { font-weight:700; font-size:1.1rem; color:var(--white); line-height:1.35; margin-bottom:16px; }
+    .detail-price { font-weight:700; font-size:1.8rem; color:var(--amber); letter-spacing:.5px; margin-bottom:20px; }
+    .detail-divider { height:1px; background:var(--border); margin:18px 0; }
+    .detail-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
+    .detail-row:last-child { border-bottom:none; }
+    .detail-row-label { font-family:'JetBrains Mono',monospace; font-size:.6rem; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+    .detail-row-val { font-weight:600; font-size:.88rem; color:var(--white); text-align:right; }
+    .grade-badge {
+      display:inline-flex; align-items:center; gap:5px;
+      font-family:'JetBrains Mono',monospace; font-size:.65rem; font-weight:500;
+      letter-spacing:1px; padding:4px 12px; border-radius:3px;
+      background:rgba(212,130,26,.15); border:1px solid rgba(212,130,26,.5); color:var(--amber);
+    }
+    .cert-link {
+      display:inline-flex; align-items:center; gap:6px;
+      font-family:'JetBrains Mono',monospace; font-size:.65rem;
+      color:var(--blue); text-decoration:none;
+      padding:6px 12px; border:1px solid rgba(42,112,184,.4);
+      border-radius:3px; margin-top:16px;
+      transition:background .15s, border-color .15s;
+      width:100%; justify-content:center;
+    }
+    .cert-link:hover { background:rgba(42,112,184,.1); border-color:var(--blue); }
+    .courtyard-link {
+      display:inline-flex; align-items:center; gap:6px;
+      font-family:'JetBrains Mono',monospace; font-size:.65rem;
+      color:var(--muted); text-decoration:none;
+      padding:6px 12px; border:1px solid var(--border2);
+      border-radius:3px; margin-top:8px;
+      transition:background .15s, color .15s;
+      width:100%; justify-content:center;
+    }
+    .courtyard-link:hover { background:var(--panel2); color:var(--white); }
+
+    /* ─── FOOTER ─── */
+    footer { background:var(--panel); border-top:1px solid var(--border); padding:20px 40px; display:flex; justify-content:space-between; align-items:center; }
+    footer p { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); letter-spacing:1px; }
+    .f-links { display:flex; gap:20px; }
+    .f-links a { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); text-decoration:none; letter-spacing:1px; transition:color .15s; }
+    .f-links a:hover { color:var(--amber); }
+
+    @media (max-width:900px) {
+      .metrics { grid-template-columns:repeat(3,1fr); }
+      nav, footer { padding:0 20px; }
+      .page { padding:0 20px 60px; }
+      .profile-worth { display:none; }
+      .collection-stats { grid-template-columns:1fr 1fr; }
+      .detail-panel { width:100%; border-left:none; top:auto; height:90vh; transform:translateY(100%); }
+      .detail-panel.open { transform:translateY(0); }
+    }
+    @media (max-width:560px) {
+      .metrics { grid-template-columns:repeat(2,1fr); }
+      .profile-name { font-size:1.8rem; }
+      .card-grid { grid-template-columns:repeat(2,1fr); }
+      .collection-stats { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <svg class="nav-ball" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="#6A7090" stroke-width="1.5"/>
+      <path d="M2 12a10 10 0 0 1 20 0" fill="#C03428" opacity=".9"/>
+      <path d="M2 12h20" stroke="#6A7090" stroke-width="1.5"/>
+      <circle cx="12" cy="12" r="3" stroke="#6A7090" stroke-width="1.5" fill="#1C1F2E"/>
+      <circle cx="12" cy="12" r="1.2" fill="#D4821A"/>
+    </svg>
+    Agent Ash
+  </div>
+  <ul class="nav-links">
+    <li><a onclick="switchTab('overview')" class="active" id="tab-overview">Overview</a></li>
+    <li><a onclick="switchTab('collection')" id="tab-collection">Collection</a></li>
+    <li><a onclick="switchTab('activity')" id="tab-activity">Activity</a></li>
+  </ul>
+  <div class="nav-status">
+    <span class="live"></span>
+    Base Mainnet &nbsp;·&nbsp; <span id="blockTag">Blk #24,581,942</span>
+  </div>
+</nav>
+
+<!-- BANNER -->
+<div class="banner">
+  <img src="1773610527334_image.png" alt="Agent Ash Banner" />
+  <div class="banner-border"></div>
+</div>
+
+<div class="page">
+
+  <!-- PROFILE (always visible) -->
+  <div class="profile">
+    <div class="avatar">
+      <img src="1773611727423_image.png" alt="Agent Ash" />
+    </div>
+    <div class="profile-text">
+      <div class="profile-eyebrow">// Unit_01 · Autonomous · Base Network</div>
+      <div class="profile-name">Agent <span>Ash</span></div>
+      <div class="profile-sub">Autonomous Onchain Pokémon Trainer</div>
+      <div class="profile-tags">
+        <span class="tag" onclick="copyWallet()">
+          <span class="tdot"></span>
+          <span id="walletLabel">0x1a2b...3c4d</span> ⎘
+        </span>
+        <span class="tag t-green">✓ Base Verified</span>
+        <span class="tag t-blue">Lvl 42 · Trainer</span>
+        <span class="tag" id="profile-txn-count">14 Txn</span>
+      </div>
+    </div>
+    <div class="profile-worth">
+      <div class="worth-label">Net Worth</div>
+      <div class="worth-val total-worth-val">$2,114.80</div>
+      <div class="worth-change" id="worth-change">▲ +$48.20 · +2.4% (24h)</div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══ TAB: OVERVIEW ══ -->
+  <div class="tab-content active" id="content-overview">
+
+    <div class="sec">
+      <span class="sec-label">Onchain Overview</span>
+      <span class="sec-line"></span>
+      <span class="sec-tag">Base Network</span>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-id">SYS_01</div>
+        <div class="metric-val blue" id="metric-eth-val">0.420</div>
+        <div class="metric-name">ETH Balance <span id="eth-live" style="font-family:'JetBrains Mono',monospace;font-size:.45rem;margin-left:4px;color:var(--muted)">● —</span></div>
+        <div class="metric-sub" id="metric-eth-sub">≈ $1,264.80</div>
+      </div>
+      <div class="metric">
+        <div class="metric-id">SYS_02</div>
+        <div class="metric-val" id="metric-usdc-val">$850</div>
+        <div class="metric-name">USDC Reserve</div>
+        <div class="metric-sub">Stablecoin</div>
+      </div>
+      <div class="metric">
+        <div class="metric-id">SYS_03</div>
+        <div class="metric-val amber">1</div>
+        <div class="metric-name">Pokémon Cards</div>
+        <div class="metric-sub" id="metric-card-sub">$1,200.00 value</div>
+      </div>
+      <div class="metric">
+        <div class="metric-id">SYS_04</div>
+        <div class="metric-val" id="metric-txn-val">14</div>
+        <div class="metric-name">Transactions</div>
+        <div class="metric-sub">All time</div>
+      </div>
+      <div class="metric">
+        <div class="metric-id">SYS_05</div>
+        <div class="metric-val green" id="metric-24h-pct">+2.4%</div>
+        <div class="metric-name">24h Change</div>
+        <div class="metric-sub up" id="metric-24h-val">+$48.20</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <span class="sec-label">Token Holdings</span>
+      <span class="sec-line"></span>
+    </div>
+
+    <div class="table-box">
+      <table>
+        <thead>
+          <tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value</th><th>24h</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="asset-cell"><div class="a-icon a-eth">ETH</div><div><div class="a-name">Ethereum</div><div class="a-net">BASE · ETH</div></div></div></td>
+            <td class="r wallet-eth-bal">0.42000</td><td class="r eth-price">$3,011.43</td><td class="val eth-value">$1,264.80</td><td class="eth-change up">+1.8%</td>
+          </tr>
+          <tr>
+            <td><div class="asset-cell"><div class="a-icon a-usdc">USDC</div><div><div class="a-name">USD Coin</div><div class="a-net">BASE · USDC</div></div></div></td>
+            <td class="r" id="usdc-amount">850.00</td><td class="r">$1.00</td><td class="val" id="usdc-value">$850.00</td><td class="up">+0.01%</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="table-foot">
+        <span class="tf-l">Total Onchain</span>
+        <span class="tf-r onchain-total">$2,114.80</span>
+      </div>
+    </div>
+
+    <!-- Mini card preview in overview -->
+    <div class="sec">
+      <span class="sec-label">Card Portfolio</span>
+      <span class="sec-line"></span>
+      <span class="sec-tag" style="cursor:pointer;text-decoration:underline;" onclick="switchTab('collection')">View All →</span>
+    </div>
+
+    <div class="card-grid">
+      <div class="p-card" onclick="openDetail(0)">
+        <div class="p-card-media-wrap">
+          <video class="p-card-media" autoplay loop muted playsinline>
+            <source src="nft_animation.mp4" type="video/mp4" />
+          </video>
+          <div class="play-hint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M10 8l6 4-6 4V8z" fill="white" stroke="none"/>
+            </svg>
+          </div>
+        </div>
+        <div class="p-card-body">
+          <div class="p-card-grade">PSA 10 · GEM MINT</div>
+          <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
+          <div class="p-card-value card-price-val">$1,200.00</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="coll-bar">
+      <div>
+        <div class="cb-label">Collection Total</div>
+        <div class="cb-sub">1 card · PSA graded · <span id="card-live" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)">● —</span></div>
+      </div>
+      <div class="cb-val collection-total-val">$1,200.00</div>
+    </div>
+
+  </div><!-- /overview -->
+
+  <!-- ══ TAB: COLLECTION ══ -->
+  <div class="tab-content" id="content-collection">
+
+    <div class="collection-stats">
+      <div class="cstat">
+        <div class="cstat-label">Total Cards</div>
+        <div class="cstat-val amber">1</div>
+      </div>
+      <div class="cstat">
+        <div class="cstat-label">Collection Value</div>
+        <div class="cstat-val collection-total-val">$1,200.00</div>
+      </div>
+      <div class="cstat">
+        <div class="cstat-label">Avg. Grade</div>
+        <div class="cstat-val">PSA 10</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <span class="sec-label">All Cards</span>
+      <span class="sec-line"></span>
+      <span class="sec-tag">1 Card · PSA Graded</span>
+    </div>
+
+    <div class="card-grid">
+      <div class="p-card" onclick="openDetail(0)">
+        <div class="p-card-media-wrap">
+          <video class="p-card-media" autoplay loop muted playsinline>
+            <source src="nft_animation.mp4" type="video/mp4" />
+          </video>
+          <div class="play-hint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M10 8l6 4-6 4V8z" fill="white" stroke="none"/>
+            </svg>
+          </div>
+        </div>
+        <div class="p-card-body">
+          <div class="p-card-grade">PSA 10 · GEM MINT</div>
+          <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
+          <div class="p-card-value card-price-val">$1,200.00</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="coll-bar">
+      <div>
+        <div class="cb-label">Collection Total</div>
+        <div class="cb-sub">1 card · PSA graded · <span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)" id="card-last-updated">Last updated: —</span></div>
+      </div>
+      <div class="cb-val collection-total-val">$1,200.00</div>
+    </div>
+
+  </div><!-- /collection -->
+
+  <!-- ══ TAB: ACTIVITY ══ -->
+  <div class="tab-content" id="content-activity">
+
+    <div class="act-filters">
+      <button class="act-filter active" onclick="filterActivity(this,'all')">All</button>
+      <button class="act-filter" onclick="filterActivity(this,'buy')">Buys</button>
+      <button class="act-filter" onclick="filterActivity(this,'receive')">Received</button>
+      <button class="act-filter" onclick="filterActivity(this,'send')">Sent</button>
+    </div>
+
+    <div class="activity-list" id="activityList">
+
+      <!-- Pinned: Card purchase -->
+      <div class="act-item pinned" data-type="buy">
+        <div class="act-icon buy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#2A8A52" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 01-8 0"/>
+          </svg>
+        </div>
+        <div class="act-body">
+          <div class="act-title">Bought — Pikachu Full Art PSA 10 #054 Dream League</div>
+          <div class="act-meta">
+            Card Purchase · via Courtyard.io &nbsp;·&nbsp;
+            <a href="https://basescan.org/tx/0xabc123" target="_blank" class="act-hash">
+              0xabc1...23ef
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="act-right">
+          <div class="act-amount red">−$400.00</div>
+          <div class="act-date">Mar 14, 2025 · 14:32</div>
+        </div>
+      </div>
+
+      <!-- Live transactions injected here -->
+      <div id="live-activity"></div>
+
+    </div>
+  </div><!-- /activity -->
+
+</div><!-- /page -->
+
+<!-- FOOTER -->
+<footer>
+  <p>Agent Ash · Base Network · 2025</p>
+  <div class="f-links">
+    <a href="#">Basescan ↗</a>
+    <a href="#">Twitter ↗</a>
+    <a href="#">Discord ↗</a>
+  </div>
+</footer>
+
+<!-- DETAIL OVERLAY + PANEL -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detailPanel">
+  <button class="detail-close" onclick="closeDetail()">×</button>
+  <div class="detail-media" id="detailMedia"></div>
+  <div class="media-tabs-bar" id="mediaTabs"></div>
+  <div class="detail-info">
+    <div class="detail-eyebrow">// Card Portfolio · PSA Graded</div>
+    <div class="detail-title" id="d-title"></div>
+    <div class="detail-price card-price-val" id="d-price">$1,200.00</div>
+    <div id="d-price-updated" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);margin-top:2px"></div>
+    <div class="detail-divider"></div>
+    <div id="d-rows"></div>
+    <a id="d-psa-link" href="#" target="_blank" class="cert-link">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
+      View PSA Certificate
+    </a>
+    <a id="d-courtyard-link" href="#" target="_blank" class="courtyard-link">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
+      View on Courtyard.io
+    </a>
+  </div>
+</div>
+
+<script>
+  const CARDS = [{
+    title: '2019 Pokémon Sun & Moon Dream League #054 Pikachu — Full Art (PSA 10 GEM MINT)',
+    grader: 'PSA', grade: '10', grade_label: 'GEM MINT',
+    cert: '99895725',
+    psa_link: 'https://www.psacard.com/cert/99895725',
+    courtyard_link: 'https://courtyard.io/asset/8c99487dc8046491286671308b38df7a8e7da26a64cf5f4ae2f6d6c71ec71a52',
+    set: 'Sun & Moon — Dream League', year: '2019',
+    number: '#054/049 CHR', language: 'Japanese',
+    price: '$1,200.00',
+    media: [
+      { type:'video', src:'nft_animation.mp4' },
+      { type:'img', src:'card_showcase.png' },
+      { type:'img', src:'card_front.png' },
+      { type:'img', src:'card_back.png' },
+    ]
+  }];
+
+  // ─── TABS ───
+  function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-links a').forEach(el => el.classList.remove('active'));
+    document.getElementById('content-' + name).classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  // ─── ACTIVITY FILTER ───
+  function filterActivity(btn, type) {
+    document.querySelectorAll('.act-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.act-item').forEach(item => {
+      item.style.display = (type === 'all' || item.dataset.type === type) ? '' : 'none';
+    });
+  }
+
+  // ─── DETAIL PANEL ───
+  function openDetail(idx) {
+    const card = CARDS[idx];
+    document.getElementById('d-title').textContent = card.title;
+    document.getElementById('d-price').textContent = card.price;
+    document.getElementById('d-psa-link').href = card.psa_link;
+    document.getElementById('d-courtyard-link').href = card.courtyard_link;
+
+    const rows = [
+      { label:'Grader',   val:card.grader },
+      { label:'Grade',    val:card.grade + ' — ' + card.grade_label, highlight:true },
+      { label:'Cert #',   val:'PSA: ' + card.cert },
+      { label:'Set',      val:card.set },
+      { label:'Year',     val:card.year },
+      { label:'Number',   val:card.number },
+      { label:'Language', val:card.language },
+    ];
+    document.getElementById('d-rows').innerHTML = rows.map(r => `
+      <div class="detail-row">
+        <span class="detail-row-label">${r.label}</span>
+        ${r.highlight
+          ? `<span class="grade-badge">${r.val}</span>`
+          : `<span class="detail-row-val">${r.val}</span>`}
+      </div>`).join('');
+
+    const container = document.getElementById('detailMedia');
+    container.innerHTML = card.media.map((m,i) => {
+      if (m.type==='video') return `<video class="p-card-media ${i===0?'active':''}" ${i===0?'autoplay':''} loop muted playsinline><source src="${m.src}" type="video/mp4"/></video>`;
+      return `<img class="p-card-media ${i===0?'active':''}" src="${m.src}" alt="" />`;
+    }).join('');
+
+    document.getElementById('mediaTabs').innerHTML = card.media.map((_,i) =>
+      `<button class="media-tab ${i===0?'active':''}" onclick="switchMedia(${i})"></button>`).join('');
+
+    document.getElementById('detailOverlay').classList.add('open');
+    requestAnimationFrame(() => document.getElementById('detailPanel').classList.add('open'));
+  }
+
+  function switchMedia(idx) {
+    const els = document.getElementById('detailMedia').querySelectorAll('video, img');
+    const tabs = document.querySelectorAll('.media-tab');
+    els.forEach((el,i) => {
+      el.classList.toggle('active', i===idx);
+      if (el.tagName==='VIDEO') { if(i===idx){el.play();} else el.pause(); }
+    });
+    tabs.forEach((t,i) => t.classList.toggle('active', i===idx));
+  }
+
+  function closeDetail() {
+    document.getElementById('detailPanel').classList.remove('open');
+    document.getElementById('detailOverlay').classList.remove('open');
+    document.querySelectorAll('#detailMedia video').forEach(v => v.pause());
+  }
+
+  function copyWallet() {
+    navigator.clipboard.writeText('0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b').then(() => {
+      const el = document.getElementById('walletLabel');
+      el.textContent = 'Copied ✓';
+      setTimeout(() => { el.textContent = '0x1a2b...3c4d'; }, 1500);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════
+  // LIVE DATA CONFIG — fill these in
+  // ═══════════════════════════════════════════════════
+  const CONFIG = {
+    // Card price (PSA 10) — update manually from pricecharting.com
+    CARD_PRICE: 378.00,
+    CARD_PRICE_UPDATED: 'Mar 15, 2025',
+
+    // USDC stablecoin balance
+    USDC_BALANCE: 850.00,
+
+    // Your Base wallet address (to fetch real ETH/USDC balance)
+    WALLET_ADDRESS: '0xe2a31c0285DAb75B461937CA649A79A7A132591F',
+  };
+  // ═══════════════════════════════════════════════════
+
+  // ── BLOCK TICKER ──
+  let block = 24581942;
+  setInterval(() => {
+    block += Math.floor(Math.random()*3);
+    document.getElementById('blockTag').textContent = 'Blk #' + block.toLocaleString();
+  }, 2000);
+
+  // Shared live balances
+  let _ethBal = 0.420;   // updated by fetchWalletBalance
+  let _usdcBal = CONFIG.USDC_BALANCE; // updated by fetchWalletBalance
+
+  // ── LIVE ETH PRICE via Binance (no key, CORS OK) ──
+  async function fetchEthPrice() {
+    try {
+      const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT');
+      const data = await res.json();
+      const price = parseFloat(data.lastPrice);
+      const change = parseFloat(data.priceChangePercent);
+
+      const ethVal = (_ethBal * price).toFixed(2);
+
+      // Update all ETH price references
+      document.querySelectorAll('.eth-price').forEach(el => el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}));
+      document.querySelectorAll('.eth-value').forEach(el => el.textContent = '$' + parseFloat(ethVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}));
+      document.querySelectorAll('.eth-change').forEach(el => {
+        const pct = change.toFixed(2);
+        el.textContent = (change >= 0 ? '+' : '') + pct + '%';
+        el.className = el.className.replace(/\bup\b|\bdn\b/, '') + (change >= 0 ? ' up' : ' dn');
+      });
+
+      // Update the ETH metric card
+      const ethMetric = document.getElementById('metric-eth-val');
+      if (ethMetric) ethMetric.textContent = _ethBal.toFixed(5);
+
+      const ethMetricSub = document.getElementById('metric-eth-sub');
+      if (ethMetricSub) ethMetricSub.textContent = '≈ $' + parseFloat(ethVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+      // Recalculate net worth (also triggers portfolio 24h change update)
+      updateNetWorth(parseFloat(ethVal));
+
+      // Mark ETH as live
+      setLiveIndicator('eth-live', true);
+    } catch(e) {
+      console.warn('ETH price fetch failed:', e);
+      setLiveIndicator('eth-live', false);
+    }
+  }
+
+  // ── CARD PRICE — try price.json first, fall back to CONFIG ──
+  function setCardPrice(price, dateLabel, isLive) {
+    updateCollectionTotal(price);
+    document.getElementById('card-last-updated').textContent = dateLabel;
+    const dUpd = document.getElementById('d-price-updated');
+    if (dUpd) dUpd.textContent = dateLabel;
+    setLiveIndicator('card-live', isLive);
+  }
+
+  async function tryPriceJson(url) {
+    const res = await fetch(url + '?_=' + Date.now());
+    if (!res.ok) throw new Error(url + ' not found');
+    const data = await res.json();
+    if (!data.price || data.price <= 0) throw new Error(url + ' has no valid price');
+    return data;
+  }
+
+  async function applyCardPrice() {
+    // Try price.json (scraped, gitignored) — must be fresh (<24h)
+    try {
+      const data = await tryPriceJson('price.json');
+      const ageMs = Date.now() - new Date(data.updated).getTime();
+      if (ageMs < 24 * 60 * 60 * 1000) {
+        const dateStr = new Date(data.updated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        console.log('[CardPrice] Using price.json:', data.price, '(scraped', dateStr + ')');
+        setCardPrice(data.price, 'Courtyard · ' + dateStr, true);
+        return;
+      }
+      console.log('[CardPrice] price.json stale (' + Math.round(ageMs/3600000) + 'h old)');
+    } catch(e) {
+      console.log('[CardPrice] price.json unavailable:', e.message);
+    }
+
+    // Try default-price.json (committed fallback)
+    try {
+      const data = await tryPriceJson('default-price.json');
+      const dateStr = new Date(data.updated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      console.log('[CardPrice] Using default-price.json:', data.price);
+      setCardPrice(data.price, 'Default · ' + dateStr, true);
+      return;
+    } catch(e) {
+      console.log('[CardPrice] default-price.json unavailable:', e.message);
+    }
+
+    // Final fallback: CONFIG
+    console.log('[CardPrice] Using CONFIG fallback:', CONFIG.CARD_PRICE);
+    setCardPrice(CONFIG.CARD_PRICE, 'Updated: ' + CONFIG.CARD_PRICE_UPDATED, true);
+  }
+
+  // ── WALLET BALANCE via Base public RPC ──
+  const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+
+  async function fetchWalletBalance() {
+    if (!CONFIG.WALLET_ADDRESS) return;
+    const addr = CONFIG.WALLET_ADDRESS.toLowerCase().replace('0x', '');
+    try {
+      // Batch: eth_getBalance + USDC balanceOf via eth_call
+      // balanceOf(address) selector = 0x70a08231, address padded to 32 bytes
+      const balanceOfData = '0x70a08231' + addr.padStart(64, '0');
+
+      const [ethRes, usdcRes, txnRes] = await Promise.all([
+        fetch('https://mainnet.base.org', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0', method: 'eth_getBalance',
+            params: [CONFIG.WALLET_ADDRESS, 'latest'], id: 1
+          })
+        }),
+        fetch('https://mainnet.base.org', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0', method: 'eth_call',
+            params: [{ to: USDC_CONTRACT, data: balanceOfData }, 'latest'], id: 2
+          })
+        }),
+        fetch('https://mainnet.base.org', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0', method: 'eth_getTransactionCount',
+            params: [CONFIG.WALLET_ADDRESS, 'latest'], id: 3
+          })
+        })
+      ]);
+
+      const ethData = await ethRes.json();
+      const usdcData = await usdcRes.json();
+      const txnData = await txnRes.json();
+
+      // Parse ETH balance (18 decimals)
+      const ethWei = parseInt(ethData.result, 16);
+      _ethBal = ethWei / 1e18;
+
+      // Parse USDC balance (6 decimals)
+      const usdcRaw = parseInt(usdcData.result, 16);
+      _usdcBal = usdcRaw / 1e6;
+
+      // Update ETH amount in table and metric card
+      document.querySelectorAll('.wallet-eth-bal').forEach(el => el.textContent = _ethBal.toFixed(5));
+      const ethMetric = document.getElementById('metric-eth-val');
+      if (ethMetric) ethMetric.textContent = _ethBal.toFixed(5);
+
+      // Update USDC amount/value in table and metric card
+      const usdcFmt = _usdcBal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      const usdcAmountEl = document.getElementById('usdc-amount');
+      if (usdcAmountEl) usdcAmountEl.textContent = _usdcBal.toFixed(2);
+      const usdcValueEl = document.getElementById('usdc-value');
+      if (usdcValueEl) usdcValueEl.textContent = '$' + usdcFmt;
+      const usdcMetricEl = document.getElementById('metric-usdc-val');
+      if (usdcMetricEl) usdcMetricEl.textContent = '$' + usdcFmt;
+
+      // Update transaction count
+      const txnCount = parseInt(txnData.result, 16);
+      const txnEl = document.getElementById('metric-txn-val');
+      if (txnEl) txnEl.textContent = txnCount;
+      const profileTxn = document.getElementById('profile-txn-count');
+      if (profileTxn) profileTxn.textContent = txnCount + ' Txn';
+
+      // Re-run ETH price calc with updated balance
+      fetchEthPrice();
+    } catch(e) {
+      console.warn('RPC fetch failed:', e);
+    }
+  }
+
+  // ── ACTIVITY — Basescan txlist + Blockscout token-transfers ──
+  const KNOWN_TOKENS = {
+    '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': { symbol: 'USDC', decimals: 6, stable: true },
+    '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca': { symbol: 'USDbC', decimals: 6, stable: true },
+    '0x50c5725949a6f0c72e6c4a641f24049a917db0cb': { symbol: 'DAI',  decimals: 18, stable: true },
+  };
+
+  function renderActivity(txns) {
+    const container = document.getElementById('live-activity');
+    const svgReceive = '<svg viewBox="0 0 24 24" fill="none" stroke="#2A70B8" stroke-width="2"><path d="M12 2v20M2 12l10 10 10-10"/></svg>';
+    const svgSend = '<svg viewBox="0 0 24 24" fill="none" stroke="#C03428" stroke-width="2"><path d="M12 22V2M22 12L12 2 2 12"/></svg>';
+
+    if (txns.length === 0) {
+      container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">No transactions found</div>';
+      return;
+    }
+
+    container.innerHTML = txns.map(tx => {
+      const icon = tx.isSend ? svgSend : svgReceive;
+      const iconClass = tx.isSend ? 'send' : 'receive';
+      const type = tx.isSend ? 'send' : 'receive';
+      const title = tx.isSend ? 'Sent' : 'Received';
+      const hashShort = tx.hash.slice(0,6) + '...' + tx.hash.slice(-4);
+
+      return `<div class="act-item" data-type="${type}">
+        <div class="act-icon ${iconClass}">${icon}</div>
+        <div class="act-body">
+          <div class="act-title">${title}</div>
+          <div class="act-meta">
+            Transfer · Base Mainnet &nbsp;·&nbsp;
+            <a href="https://basescan.org/tx/${tx.hash}" target="_blank" class="act-hash">
+              ${hashShort}
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
+            </a>
+          </div>
+        </div>
+        <div class="act-right">
+          <div class="act-amount ${tx.amountClass}">${tx.amount}</div>
+          <div class="act-date">${tx.dateStr}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Re-apply current filter
+    const activeFilter = document.querySelector('.act-filter.active');
+    if (activeFilter) {
+      const label = activeFilter.textContent.trim();
+      const typeMap = { 'All':'all', 'Buys':'buy', 'Received':'receive', 'Sent':'send' };
+      filterActivity(activeFilter, typeMap[label] || 'all');
+    }
+  }
+
+  function parseBasescanTxns(results) {
+    const addrLower = CONFIG.WALLET_ADDRESS.toLowerCase();
+    return results.map(tx => {
+      const isSend = tx.from.toLowerCase() === addrLower;
+      const sign = isSend ? '−' : '+';
+      let amount, amountClass = isSend ? 'red' : 'green';
+
+      // Check if tx.to is a known token contract (ERC-20 transfer)
+      const tokenInfo = KNOWN_TOKENS[tx.to.toLowerCase()];
+      if (tokenInfo && tx.input && tx.input.startsWith('0xa9059cbb')) {
+        // Decode transfer(address,uint256) — last 32 bytes = amount
+        const rawHex = tx.input.slice(74); // skip 0xa9059cbb + 32-byte address
+        const rawVal = parseInt(rawHex, 16) / Math.pow(10, tokenInfo.decimals);
+        if (tokenInfo.stable) {
+          amount = sign + '$' + rawVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ' + tokenInfo.symbol;
+        } else {
+          amount = sign + rawVal.toFixed(5) + ' ' + tokenInfo.symbol;
+        }
+      } else {
+        const ethAmt = parseFloat(tx.value) / 1e18;
+        if (ethAmt > 0) {
+          amount = sign + ethAmt.toFixed(5) + ' ETH';
+        } else {
+          amount = 'Contract call';
+          amountClass = 'amber';
+        }
+      }
+
+      const date = new Date(parseInt(tx.timeStamp) * 1000);
+      const dateStr = date.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+        + ' · ' + date.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+
+      return { hash: tx.hash, isSend, amount, amountClass, dateStr };
+    });
+  }
+
+  async function fetchActivity() {
+    if (!CONFIG.WALLET_ADDRESS) return;
+    const container = document.getElementById('live-activity');
+    container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">Loading transactions...</div>';
+
+    try {
+      const url = `https://base.blockscout.com/api?module=account&action=txlist&address=${CONFIG.WALLET_ADDRESS}&startblock=0&endblock=99999999&page=1&offset=10&sort=desc`;
+      console.log('[Activity] Fetching:', url);
+      const res = await fetch(url);
+      const data = await res.json();
+      console.log('[Activity] Response:', data);
+      if (data.status === '1' && data.result && data.result.length > 0) {
+        const txns = parseBasescanTxns(data.result);
+        console.log('[Activity] Parsed txns:', txns);
+        renderActivity(txns);
+        return;
+      }
+      console.warn('[Activity] No results in response:', data);
+      container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">No transactions found</div>';
+    } catch(e) {
+      console.warn('[Activity] Fetch failed:', e);
+      container.innerHTML = '<div style="padding:18px;color:var(--red);font-size:.8rem;text-align:center">Failed to load transactions — check console</div>';
+    }
+  }
+
+  let _ethValue = 1264.80;
+  let _cardValue = 1200.00;
+
+  // ── PORTFOLIO SNAPSHOTS (localStorage) ──
+  const SNAP_KEY = 'agentAsh_history';
+  const HOURS_48 = 48 * 60 * 60 * 1000;
+  const HOURS_24 = 24 * 60 * 60 * 1000;
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(SNAP_KEY)) || []; }
+    catch { return []; }
+  }
+
+  function saveSnapshot(totalValue) {
+    const now = Date.now();
+    let history = loadHistory();
+
+    // Only add a new entry if at least 30 min since last
+    const last = history.length ? history[history.length - 1] : null;
+    if (!last || (now - last.timestamp) >= 30 * 60 * 1000) {
+      history.push({ timestamp: now, totalValue });
+    } else {
+      // Update the most recent entry with current value
+      history[history.length - 1].totalValue = totalValue;
+    }
+
+    // If this is the very first snapshot, seed a "24h ago" baseline
+    if (history.length === 1) {
+      history.unshift({ timestamp: now - HOURS_24, totalValue });
+    }
+
+    // Prune anything older than 48h
+    const cutoff = now - HOURS_48;
+    history = history.filter(s => s.timestamp >= cutoff);
+
+    localStorage.setItem(SNAP_KEY, JSON.stringify(history));
+    return history;
+  }
+
+  function get24hChange(currentTotal) {
+    const history = loadHistory();
+    if (history.length < 2) return null;
+
+    const now = Date.now();
+    const target = now - HOURS_24;
+
+    // Find snapshot closest to 24h ago
+    let closest = history[0];
+    let closestDiff = Math.abs(closest.timestamp - target);
+    for (const snap of history) {
+      const diff = Math.abs(snap.timestamp - target);
+      if (diff < closestDiff) {
+        closest = snap;
+        closestDiff = diff;
+      }
+    }
+
+    const oldVal = closest.totalValue;
+    if (!oldVal || oldVal <= 0) return null;
+    const dollarChange = currentTotal - oldVal;
+    const pctChange = (dollarChange / oldVal) * 100;
+    return { dollarChange, pctChange };
+  }
+
+  function update24hDisplay(total) {
+    const result = get24hChange(total);
+
+    const pctEl = document.getElementById('metric-24h-pct');
+    const valEl = document.getElementById('metric-24h-val');
+    const worthEl = document.getElementById('worth-change');
+
+    if (!result) {
+      if (pctEl) { pctEl.textContent = '—'; pctEl.className = 'metric-val'; }
+      if (valEl) { valEl.textContent = 'Collecting data...'; valEl.className = 'metric-sub'; }
+      if (worthEl) { worthEl.textContent = '— · Collecting 24h data'; worthEl.style.color = 'var(--muted)'; }
+      return;
+    }
+
+    const { dollarChange, pctChange } = result;
+    const up = dollarChange >= 0;
+    const sign = up ? '+' : '';
+    const pctStr = sign + pctChange.toFixed(2) + '%';
+    const dollarStr = sign + '$' + Math.abs(dollarChange).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+    if (pctEl) {
+      pctEl.textContent = pctStr;
+      pctEl.className = 'metric-val ' + (up ? 'green' : 'red');
+    }
+    if (valEl) {
+      valEl.textContent = dollarStr;
+      valEl.className = 'metric-sub ' + (up ? 'up' : 'dn');
+    }
+    if (worthEl) {
+      worthEl.textContent = (up ? '▲' : '▼') + ' ' + dollarStr + ' · ' + pctStr + ' (24h)';
+      worthEl.style.color = up ? 'var(--green)' : 'var(--red)';
+    }
+  }
+
+  function updateNetWorth(ethVal) {
+    _ethValue = ethVal;
+    const total = _ethValue + _usdcBal + _cardValue; // eth + usdc + cards
+    document.querySelectorAll('.total-worth-val').forEach(el => {
+      el.textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    });
+    // Update onchain total
+    const onchain = _ethValue + _usdcBal;
+    document.querySelectorAll('.onchain-total').forEach(el => {
+      el.textContent = '$' + onchain.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    });
+
+    // Save snapshot and update 24h change display
+    saveSnapshot(total);
+    update24hDisplay(total);
+  }
+
+  function updateCollectionTotal(cardVal) {
+    _cardValue = cardVal;
+    document.querySelectorAll('.card-price-val').forEach(el => {
+      el.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    });
+    document.querySelectorAll('.collection-total-val').forEach(el => {
+      el.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    });
+    const cardMetricSub = document.getElementById('metric-card-sub');
+    if (cardMetricSub) cardMetricSub.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' value';
+    updateNetWorth(_ethValue);
+  }
+
+  function setLiveIndicator(id, isLive) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = isLive ? '● LIVE' : '● CACHED';
+    el.style.color = isLive ? 'var(--green)' : 'var(--muted)';
+  }
+
+  // ── INIT: fetch all live data ──
+  fetchEthPrice();
+  applyCardPrice();
+  fetchWalletBalance();
+  fetchActivity();
+  // Refresh ETH price + wallet balance every 60s
+  setInterval(fetchEthPrice, 60000);
+  setInterval(fetchWalletBalance, 60000);
+</script>
+</body>
+</html>
