@@ -547,7 +547,7 @@
   </ul>
   <div class="nav-status">
     <span class="live"></span>
-    Base Mainnet &nbsp;·&nbsp; <span id="blockTag">Blk #24,581,942</span>
+    Base Mainnet
   </div>
 </nav>
 
@@ -948,13 +948,6 @@
     WALLET_ADDRESS: '0xe2a31c0285DAb75B461937CA649A79A7A132591F',
   };
   // ═══════════════════════════════════════════════════
-
-  // ── BLOCK TICKER ──
-  let block = 24581942;
-  setInterval(() => {
-    block += Math.floor(Math.random()*3);
-    document.getElementById('blockTag').textContent = 'Blk #' + block.toLocaleString();
-  }, 2000);
 
   // Shared live balances
   let _ethBal = 0.420;   // updated by fetchWalletBalance
