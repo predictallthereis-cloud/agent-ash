@@ -111,6 +111,7 @@
     .worth-label { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
     .worth-val { font-weight:700; font-size:2rem; color:var(--white); letter-spacing:1px; margin-top:2px; }
     .worth-change { font-family:'JetBrains Mono',monospace; font-size:.6rem; color:var(--green); margin-top:3px; }
+    .profile-worth-mobile { display:none; }
 
     /* ─── DIVIDER / SECTION ─── */
     .divider { border:none; border-top:1px solid var(--border); margin-bottom:28px; }
@@ -429,15 +430,22 @@
         flex-direction:column; align-items:center; text-align:center;
         margin-top:-36px; margin-bottom:24px; gap:12px;
       }
-      .avatar { width:76px; height:76px; }
+      .avatar { width:88px; height:88px; }
+      .profile-name { font-size:2rem; }
       .profile-text { padding-bottom:0; }
       .profile-tags { justify-content:center; }
       .profile-worth { display:none; }
+      .profile-worth-mobile {
+        display:block; text-align:center; margin:8px 0 4px;
+      }
+      .profile-worth-mobile .worth-val { font-size:1.8rem; }
+      .profile-worth-mobile .worth-change { font-size:.58rem; }
 
-      /* Metrics: 2 columns */
+      /* Metrics: 2 columns, last spans full */
       .metrics { grid-template-columns:repeat(2,1fr); }
       .metric { padding:14px 12px; }
       .metric-val { font-size:1.25rem; }
+      .metric:last-child { grid-column:1 / -1; text-align:center; }
 
       /* Table: hide Price column, scrollable */
       .table-box { overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -500,7 +508,7 @@
 
     /* ─── SMALL MOBILE (<400px) ─── */
     @media (max-width:400px) {
-      .profile-name { font-size:1.6rem; }
+      .profile-name { font-size:1.8rem; }
       .profile-eyebrow { font-size:.52rem; }
       .metric { padding:12px 10px; }
       .metric-val { font-size:1.1rem; }
@@ -560,6 +568,10 @@
       <div class="profile-eyebrow">// Unit_01 · Autonomous · Base Network</div>
       <div class="profile-name">Agent <span>Ash</span></div>
       <div class="profile-sub">Autonomous Onchain Pokémon Trainer</div>
+      <div class="profile-worth-mobile">
+        <div class="worth-val total-worth-val">$2,114.80</div>
+        <div class="worth-change" id="worth-change-mobile">▲ +$48.20 · +2.4% (24h)</div>
+      </div>
       <div class="profile-tags">
         <span class="tag" onclick="copyWallet()">
           <span class="tdot"></span>
@@ -974,7 +986,10 @@
       const ethMetricSub = document.getElementById('metric-eth-sub');
       if (ethMetricSub) ethMetricSub.textContent = '≈ $' + parseFloat(ethVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 
-      // Recalculate net worth (also triggers portfolio 24h change update)
+      // Update SYS_05 — 24h change from Binance
+      update24hFromBinance(change, _ethBal * price);
+
+      // Recalculate net worth
       updateNetWorth(parseFloat(ethVal));
 
       // Mark ETH as live
@@ -1228,99 +1243,30 @@
   let _ethValue = 1264.80;
   let _cardValue = 1200.00;
 
-  // ── PORTFOLIO SNAPSHOTS (localStorage) ──
-  const SNAP_KEY = 'agentAsh_history';
-  const HOURS_48 = 48 * 60 * 60 * 1000;
-  const HOURS_24 = 24 * 60 * 60 * 1000;
-
-  function loadHistory() {
-    try { return JSON.parse(localStorage.getItem(SNAP_KEY)) || []; }
-    catch { return []; }
-  }
-
-  function saveSnapshot(totalValue) {
-    const now = Date.now();
-    let history = loadHistory();
-
-    // Only add a new entry if at least 30 min since last
-    const last = history.length ? history[history.length - 1] : null;
-    if (!last || (now - last.timestamp) >= 30 * 60 * 1000) {
-      history.push({ timestamp: now, totalValue });
-    } else {
-      // Update the most recent entry with current value
-      history[history.length - 1].totalValue = totalValue;
-    }
-
-    // If this is the very first snapshot, seed a "24h ago" baseline
-    if (history.length === 1) {
-      history.unshift({ timestamp: now - HOURS_24, totalValue });
-    }
-
-    // Prune anything older than 48h
-    const cutoff = now - HOURS_48;
-    history = history.filter(s => s.timestamp >= cutoff);
-
-    localStorage.setItem(SNAP_KEY, JSON.stringify(history));
-    return history;
-  }
-
-  function get24hChange(currentTotal) {
-    const history = loadHistory();
-    if (history.length < 2) return null;
-
-    const now = Date.now();
-    const target = now - HOURS_24;
-
-    // Find snapshot closest to 24h ago
-    let closest = history[0];
-    let closestDiff = Math.abs(closest.timestamp - target);
-    for (const snap of history) {
-      const diff = Math.abs(snap.timestamp - target);
-      if (diff < closestDiff) {
-        closest = snap;
-        closestDiff = diff;
-      }
-    }
-
-    const oldVal = closest.totalValue;
-    if (!oldVal || oldVal <= 0) return null;
-    const dollarChange = currentTotal - oldVal;
-    const pctChange = (dollarChange / oldVal) * 100;
-    return { dollarChange, pctChange };
-  }
-
-  function update24hDisplay(total) {
-    const result = get24hChange(total);
-
-    const pctEl = document.getElementById('metric-24h-pct');
-    const valEl = document.getElementById('metric-24h-val');
-    const worthEl = document.getElementById('worth-change');
-
-    if (!result) {
-      if (pctEl) { pctEl.textContent = '—'; pctEl.className = 'metric-val'; }
-      if (valEl) { valEl.textContent = 'Collecting data...'; valEl.className = 'metric-sub'; }
-      if (worthEl) { worthEl.textContent = '— · Collecting 24h data'; worthEl.style.color = 'var(--muted)'; }
-      return;
-    }
-
-    const { dollarChange, pctChange } = result;
-    const up = dollarChange >= 0;
+  // ── 24h CHANGE — direct from Binance API ──
+  function update24hFromBinance(changePct, ethValueUsd) {
+    const up = changePct >= 0;
     const sign = up ? '+' : '';
-    const pctStr = sign + pctChange.toFixed(2) + '%';
+    const pctStr = sign + changePct.toFixed(2) + '%';
+    const dollarChange = ethValueUsd * (changePct / 100);
     const dollarStr = sign + '$' + Math.abs(dollarChange).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 
+    const pctEl = document.getElementById('metric-24h-pct');
     if (pctEl) {
       pctEl.textContent = pctStr;
       pctEl.className = 'metric-val ' + (up ? 'green' : 'red');
     }
+    const valEl = document.getElementById('metric-24h-val');
     if (valEl) {
       valEl.textContent = dollarStr;
       valEl.className = 'metric-sub ' + (up ? 'up' : 'dn');
     }
-    if (worthEl) {
-      worthEl.textContent = (up ? '▲' : '▼') + ' ' + dollarStr + ' · ' + pctStr + ' (24h)';
-      worthEl.style.color = up ? 'var(--green)' : 'var(--red)';
-    }
+
+    // Update both worth-change elements (desktop + mobile)
+    document.querySelectorAll('#worth-change, #worth-change-mobile').forEach(el => {
+      el.textContent = (up ? '▲' : '▼') + ' ' + dollarStr + ' · ' + pctStr + ' (24h)';
+      el.style.color = up ? 'var(--green)' : 'var(--red)';
+    });
   }
 
   function updateNetWorth(ethVal) {
@@ -1334,10 +1280,6 @@
     document.querySelectorAll('.onchain-total').forEach(el => {
       el.textContent = '$' + onchain.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     });
-
-    // Save snapshot and update 24h change display
-    saveSnapshot(total);
-    update24hDisplay(total);
   }
 
   function updateCollectionTotal(cardVal) {
