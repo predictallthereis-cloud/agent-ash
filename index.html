@@ -676,15 +676,7 @@
     <div class="card-grid">
       <div class="p-card" onclick="openDetail(0)">
         <div class="p-card-media-wrap">
-          <video class="p-card-media" autoplay loop muted playsinline>
-            <source src="nft_animation.mp4" type="video/mp4" />
-          </video>
-          <div class="play-hint">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M10 8l6 4-6 4V8z" fill="white" stroke="none"/>
-            </svg>
-          </div>
+          <img class="p-card-media" src="card_showcase.png" alt="Pikachu Full Art PSA 10" />
         </div>
         <div class="p-card-body">
           <div class="p-card-grade">PSA 10 · GEM MINT</div>
@@ -731,15 +723,7 @@
     <div class="card-grid">
       <div class="p-card" onclick="openDetail(0)">
         <div class="p-card-media-wrap">
-          <video class="p-card-media" autoplay loop muted playsinline>
-            <source src="nft_animation.mp4" type="video/mp4" />
-          </video>
-          <div class="play-hint">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M10 8l6 4-6 4V8z" fill="white" stroke="none"/>
-            </svg>
-          </div>
+          <img class="p-card-media" src="card_showcase.png" alt="Pikachu Full Art PSA 10" />
         </div>
         <div class="p-card-body">
           <div class="p-card-grade">PSA 10 · GEM MINT</div>
@@ -881,7 +865,8 @@
   function openDetail(idx) {
     const card = CARDS[idx];
     document.getElementById('d-title').textContent = card.title;
-    document.getElementById('d-price').textContent = card.price;
+    const livePrice = document.querySelector('.card-price-val')?.textContent || card.price;
+    document.getElementById('d-price').textContent = livePrice;
     document.getElementById('d-psa-link').href = card.psa_link;
     document.getElementById('d-courtyard-link').href = card.courtyard_link;
 
