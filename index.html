@@ -380,6 +380,15 @@
     .f-links a { font-family:'JetBrains Mono',monospace; font-size:.58rem; color:var(--muted); text-decoration:none; letter-spacing:1px; transition:color .15s; }
     .f-links a:hover { color:var(--amber); }
 
+    /* ─── HAMBURGER BUTTON ─── */
+    .nav-hamburger {
+      display:none; background:none; border:none; cursor:pointer; padding:8px;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .nav-hamburger svg { width:22px; height:22px; stroke:var(--muted); transition:stroke .15s; }
+    .nav-hamburger:hover svg { stroke:var(--amber); }
+
+    /* ─── TABLET ─── */
     @media (max-width:900px) {
       .metrics { grid-template-columns:repeat(3,1fr); }
       nav, footer { padding:0 20px; }
@@ -389,11 +398,118 @@
       .detail-panel { width:100%; border-left:none; top:auto; height:90vh; transform:translateY(100%); }
       .detail-panel.open { transform:translateY(0); }
     }
-    @media (max-width:560px) {
+
+    /* ─── MOBILE (<768px) ─── */
+    @media (max-width:768px) {
+      /* Nav: hamburger */
+      nav { padding:0 16px; height:48px; flex-wrap:wrap; }
+      .nav-hamburger { display:block; order:3; }
+      .nav-status { display:none; }
+      .nav-links {
+        display:none; flex-direction:column; width:100%;
+        order:4; background:var(--panel); border-top:1px solid var(--border);
+        padding:8px 0;
+      }
+      .nav-links.open { display:flex; }
+      .nav-links li { width:100%; }
+      .nav-links a {
+        height:44px; line-height:44px; padding:0 16px;
+        border-bottom:none; font-size:.7rem;
+      }
+      .nav-links a.active { background:rgba(212,130,26,.08); border-left:2px solid var(--amber); }
+
+      /* Banner */
+      .banner { height:180px; }
+
+      /* Page padding */
+      .page { padding:0 14px 48px; }
+
+      /* Profile: stack vertically, centered */
+      .profile {
+        flex-direction:column; align-items:center; text-align:center;
+        margin-top:-36px; margin-bottom:24px; gap:12px;
+      }
+      .avatar { width:76px; height:76px; }
+      .profile-text { padding-bottom:0; }
+      .profile-tags { justify-content:center; }
+      .profile-worth { display:none; }
+
+      /* Metrics: 2 columns */
       .metrics { grid-template-columns:repeat(2,1fr); }
-      .profile-name { font-size:1.8rem; }
-      .card-grid { grid-template-columns:repeat(2,1fr); }
-      .collection-stats { grid-template-columns:1fr; }
+      .metric { padding:14px 12px; }
+      .metric-val { font-size:1.25rem; }
+
+      /* Table: hide Price column, scrollable */
+      .table-box { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      table { min-width:auto; }
+      th:nth-child(3), td:nth-child(3) { display:none; }
+      th, td { padding:10px 12px; font-size:.8rem; }
+      .a-icon { width:28px; height:28px; font-size:.5rem; }
+      .asset-cell { gap:8px; }
+      .a-name { font-size:.8rem; }
+
+      /* Card grid: 2 columns */
+      .card-grid { grid-template-columns:repeat(2,1fr); gap:10px; }
+      .p-card-name { font-size:.75rem; }
+      .p-card-value { font-size:.9rem; }
+
+      /* Collection stats */
+      .collection-stats { grid-template-columns:1fr; gap:8px; }
+      .cstat { padding:14px 16px; }
+
+      /* Collection bar */
+      .coll-bar { padding:12px 16px; flex-direction:column; gap:8px; align-items:flex-start; }
+      .cb-val { font-size:1.2rem; }
+
+      /* Activity: prevent overflow */
+      .act-item { padding:12px 14px; gap:10px; grid-template-columns:36px 1fr auto; }
+      .act-icon { width:34px; height:34px; }
+      .act-title { font-size:.82rem; max-width:180px; }
+      .act-meta { font-size:.52rem; }
+      .act-hash { max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle; }
+      .act-amount { font-size:.85rem; }
+      .act-date { font-size:.52rem; }
+      .act-filters { gap:6px; flex-wrap:wrap; }
+      .act-filter { padding:6px 10px; font-size:.55rem; }
+
+      /* Detail panel: full screen, slide up */
+      .detail-panel {
+        width:100%; max-width:100vw; height:100vh; height:100dvh;
+        top:0; left:0; right:0; bottom:0;
+        border-left:none; border-radius:0;
+        transform:translateY(100%);
+      }
+      .detail-panel.open { transform:translateY(0); }
+      .detail-media { aspect-ratio:auto; max-height:45vh; }
+      .detail-info { padding:16px; }
+      .detail-title { font-size:1rem; }
+      .detail-price { font-size:1.4rem; }
+      .detail-close { top:10px; right:10px; width:36px; height:36px; font-size:1.2rem; }
+      .cert-link, .courtyard-link { padding:10px 12px; font-size:.6rem; }
+
+      /* Footer */
+      footer { padding:16px; flex-direction:column; gap:10px; text-align:center; }
+
+      /* Prevent horizontal scroll */
+      html, body { overflow-x:hidden; }
+
+      /* Bigger tap targets */
+      .tag { padding:6px 12px; font-size:.58rem; min-height:32px; }
+      .nav-links a { min-height:44px; }
+    }
+
+    /* ─── SMALL MOBILE (<400px) ─── */
+    @media (max-width:400px) {
+      .profile-name { font-size:1.6rem; }
+      .profile-eyebrow { font-size:.52rem; }
+      .metric { padding:12px 10px; }
+      .metric-val { font-size:1.1rem; }
+      .metric-name { font-size:.65rem; }
+      .metric-sub { font-size:.5rem; }
+      .p-card-body { padding:10px 10px 12px; }
+      .p-card-grade { font-size:.48rem; }
+      .act-title { max-width:140px; }
+      .act-amount { font-size:.78rem; }
     }
   </style>
 </head>
@@ -411,10 +527,15 @@
     </svg>
     Agent Ash
   </div>
-  <ul class="nav-links">
-    <li><a onclick="switchTab('overview')" class="active" id="tab-overview">Overview</a></li>
-    <li><a onclick="switchTab('collection')" id="tab-collection">Collection</a></li>
-    <li><a onclick="switchTab('activity')" id="tab-activity">Activity</a></li>
+  <button class="nav-hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <ul class="nav-links" id="navLinks">
+    <li><a onclick="switchTab('overview');closeMenu()" class="active" id="tab-overview">Overview</a></li>
+    <li><a onclick="switchTab('collection');closeMenu()" id="tab-collection">Collection</a></li>
+    <li><a onclick="switchTab('activity');closeMenu()" id="tab-activity">Activity</a></li>
   </ul>
   <div class="nav-status">
     <span class="live"></span>
@@ -718,6 +839,10 @@
   }];
 
   // ─── TABS ───
+  function closeMenu() {
+    document.getElementById('navLinks').classList.remove('open');
+  }
+
   function switchTab(name) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-links a').forEach(el => el.classList.remove('active'));
