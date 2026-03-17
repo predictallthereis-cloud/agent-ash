@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agent Ash</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%231C1F2E' stroke='%232E3248' stroke-width='4'/><path d='M2 32a30 30 0 0 1 60 0' fill='%23C03428'/><rect x='2' y='30' width='60' height='4' fill='%23D4821A'/><circle cx='32' cy='32' r='10' fill='%231C1F2E' stroke='%23D4821A' stroke-width='2'/><circle cx='32' cy='32' r='4' fill='%23D4821A'/></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%231C1F2E' stroke='%232E3248' stroke-width='4'/><path d='M2 32a30 30 0 0 1 60 0' fill='%23C03428'/><rect x='2' y='30' width='60' height='4' fill='%23D4821A'/><circle cx='32' cy='32' r='10' fill='%231C1F2E' stroke='%23D4821A' stroke-width='2'/><circle cx='32' cy='32' r='4' fill='%232A70B8'/></svg>" />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
@@ -912,7 +912,12 @@
       `<button class="media-tab ${i===0?'active':''}" onclick="switchMedia(${i})"></button>`).join('');
 
     document.getElementById('detailOverlay').classList.add('open');
-    requestAnimationFrame(() => document.getElementById('detailPanel').classList.add('open'));
+    requestAnimationFrame(() => {
+      document.getElementById('detailPanel').classList.add('open');
+      // Autoplay the first video if present
+      const vid = container.querySelector('video.active');
+      if (vid) vid.play().catch(() => {});
+    });
   }
 
   function switchMedia(idx) {

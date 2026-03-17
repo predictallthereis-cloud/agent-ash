@@ -50,28 +50,46 @@ async function scrapePrice() {
     await new Promise(r => setTimeout(r, 3000));
 
     const price = await page.evaluate(() => {
-      const bodyText = document.body.innerText;
+      // Strategy 1: Find the element containing "Market Value" and get the price next to it
+      const allEls = [...document.querySelectorAll('*')];
+      for (const el of allEls) {
+        const text = el.textContent.trim();
+        // Match elements whose own text (not children) contains "Market Value"
+        const ownText = [...el.childNodes]
+          .filter(n => n.nodeType === 3)
+          .map(n => n.textContent).join('');
+        if (/market\s*value/i.test(ownText) || (el.children.length === 0 && /market\s*value/i.test(text))) {
+          // Look for a dollar amount in the parent or next sibling
+          const parent = el.closest('div, section, li') || el.parentElement;
+          if (parent) {
+            const parentText = parent.textContent;
+            const m = parentText.match(/Market\s*Value[:\s]*\$([0-9,]+(?:\.\d{2})?)/i);
+            if (m) return parseFloat(m[1].replace(/,/g, ''));
+            // Also try: sibling or nearby dollar amount
+            const dollarMatch = parentText.match(/\$([0-9,]+\.\d{2})/);
+            if (dollarMatch) return parseFloat(dollarMatch[1].replace(/,/g, ''));
+          }
+        }
+      }
 
+      // Strategy 2: Regex on full page text for "Market Value" followed by price
+      const bodyText = document.body.innerText;
       const mvMatch = bodyText.match(/Market\s*Value[:\s]*\$([0-9,]+(?:\.\d{2})?)/i);
       if (mvMatch) return parseFloat(mvMatch[1].replace(/,/g, ''));
 
+      // Strategy 3: "Market Value" on one line, price on the next
+      const lines = bodyText.split('\n').map(l => l.trim());
+      for (let i = 0; i < lines.length - 1; i++) {
+        if (/market\s*value/i.test(lines[i])) {
+          const nextPrice = lines[i+1].match(/\$([0-9,]+(?:\.\d{2})?)/);
+          if (nextPrice) return parseFloat(nextPrice[1].replace(/,/g, ''));
+        }
+      }
+
+      // Strategy 4: Last resort — "Estimated Value" or generic "Price"
       const evMatch = bodyText.match(/Est(?:imated)?\s*Value[:\s]*\$([0-9,]+(?:\.\d{2})?)/i);
       if (evMatch) return parseFloat(evMatch[1].replace(/,/g, ''));
 
-      const priceMatch = bodyText.match(/Price[:\s]*\$([0-9,]+(?:\.\d{2})?)/i);
-      if (priceMatch) return parseFloat(priceMatch[1].replace(/,/g, ''));
-
-      const allPrices = [...document.querySelectorAll('*')].reduce((found, el) => {
-        const text = el.textContent.trim();
-        const m = text.match(/^\$([0-9,]+\.\d{2})$/);
-        if (m) {
-          const val = parseFloat(m[1].replace(/,/g, ''));
-          if (val > 50 && val < 50000) found.push(val);
-        }
-        return found;
-      }, []);
-
-      if (allPrices.length > 0) return allPrices[0];
       return null;
     });
 
