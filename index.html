@@ -1009,43 +1009,47 @@
     setLiveIndicator('card-live', isLive);
   }
 
-  async function tryPriceJson(url) {
-    const res = await fetch(url + '?_=' + Date.now());
-    if (!res.ok) throw new Error(url + ' not found');
+  const PRICE_API = 'https://agent-ash-api.onrender.com/price';
+  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+  async function fetchPriceFrom(url) {
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_=' + Date.now());
+    if (!res.ok) throw new Error(url + ' → ' + res.status);
     const data = await res.json();
     if (!data.price || data.price <= 0) throw new Error(url + ' has no valid price');
     return data;
   }
 
   async function applyCardPrice() {
-    // Try price.json (scraped, gitignored) — must be fresh (<24h)
-    try {
-      const data = await tryPriceJson('price.json');
-      const ageMs = Date.now() - new Date(data.updated).getTime();
-      if (ageMs < 24 * 60 * 60 * 1000) {
-        const dateStr = new Date(data.updated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-        console.log('[CardPrice] Using price.json:', data.price, '(scraped', dateStr + ')');
-        setCardPrice(data.price, 'Courtyard · ' + dateStr, true);
-        return;
-      }
-      console.log('[CardPrice] price.json stale (' + Math.round(ageMs/3600000) + 'h old)');
-    } catch(e) {
-      console.log('[CardPrice] price.json unavailable:', e.message);
-    }
+    const sources = isLocalhost
+      ? ['price.json', 'default-price.json', PRICE_API]
+      : [PRICE_API, 'default-price.json'];
 
-    // Try default-price.json (committed fallback)
-    try {
-      const data = await tryPriceJson('default-price.json');
-      const dateStr = new Date(data.updated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-      console.log('[CardPrice] Using default-price.json:', data.price);
-      setCardPrice(data.price, 'Default · ' + dateStr, true);
-      return;
-    } catch(e) {
-      console.log('[CardPrice] default-price.json unavailable:', e.message);
+    for (const src of sources) {
+      try {
+        const data = await fetchPriceFrom(src);
+
+        // For local price.json, enforce 24h freshness
+        if (src === 'price.json') {
+          const ageMs = Date.now() - new Date(data.updated).getTime();
+          if (ageMs >= 24 * 60 * 60 * 1000) {
+            console.log('[CardPrice]', src, 'stale (' + Math.round(ageMs/3600000) + 'h), skipping');
+            continue;
+          }
+        }
+
+        const dateStr = new Date(data.updated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        const label = data.source === 'fallback' ? 'Default · ' + dateStr : 'Courtyard · ' + dateStr;
+        console.log('[CardPrice] Using', src + ':', data.price);
+        setCardPrice(data.price, label, true);
+        return;
+      } catch(e) {
+        console.log('[CardPrice]', src, 'failed:', e.message);
+      }
     }
 
     // Final fallback: CONFIG
-    console.log('[CardPrice] Using CONFIG fallback:', CONFIG.CARD_PRICE);
+    console.log('[CardPrice] All sources failed, using CONFIG:', CONFIG.CARD_PRICE);
     setCardPrice(CONFIG.CARD_PRICE, 'Updated: ' + CONFIG.CARD_PRICE_UPDATED, true);
   }
 
