@@ -23,13 +23,13 @@ async function scrapePrice() {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: 'new',
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--single-process',
       ],
     });
 
