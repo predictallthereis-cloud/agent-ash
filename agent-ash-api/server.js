@@ -181,54 +181,60 @@ async function fetchCourtyardCards() {
   const apiKey = process.env.POLYGONSCAN_API_KEY || '';
   const cards = [];
 
+  async function fetchTokenMetadata(token) {
+    const paddedId = BigInt(token.tokenId).toString(16).padStart(64, '0');
+    const ethCallUrl = `https://api.etherscan.io/v2/api?chainid=137&module=proxy&action=eth_call&to=${token.contractAddress}&data=0xc87b56dd${paddedId}&tag=latest&apikey=${apiKey}`;
+    const ethRes = await fetchWithTimeout(ethCallUrl, {}, 8000);
+    const ethJson = await ethRes.json();
+
+    if (!ethJson.result || ethJson.result === '0x' || ethJson.error) {
+      throw new Error(`eth_call: ${ethJson.error?.message || ethJson.result || 'empty'}`);
+    }
+
+    // Decode ABI-encoded string
+    const hex = ethJson.result.replace('0x', '');
+    const offset = parseInt(hex.slice(0, 64), 16) * 2;
+    const length = parseInt(hex.slice(offset, offset + 64), 16);
+    const tokenUri = Buffer.from(hex.slice(offset + 64, offset + 64 + length * 2), 'hex').toString('utf8');
+
+    // Fetch metadata JSON from tokenURI
+    const metaRes = await fetchWithTimeout(tokenUri, {}, 5000);
+    if (!metaRes.ok) throw new Error(`metadata HTTP ${metaRes.status}`);
+    const meta = await metaRes.json();
+
+    const name = meta.name || token.tokenName || `Token #${token.tokenId}`;
+    const gradeMatch = name.match(/\((PSA|CGC|BGS|SGC)\s+(\d+(?:\.\d+)?)\s+([^)]+)\)/i);
+    const grade = meta.grade || meta.psa_grade
+      || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || ''))?.value
+      || (gradeMatch ? `${gradeMatch[1]} ${gradeMatch[2]} ${gradeMatch[3]}`.trim() : null);
+
+    return {
+      tokenId: token.tokenId,
+      name,
+      image: meta.image || meta.image_url || null,
+      grade,
+      contractAddress: token.contractAddress,
+      attributes: meta.attributes || [],
+    };
+  }
+
+  function isIncomplete(card) {
+    return card.name === 'Courtyard' || card.name.startsWith('Token #') || (!card.image && !card.grade);
+  }
+
+  // First pass: 200ms delay between calls to respect rate limit
   for (let i = 0; i < ownedTokens.length; i++) {
     const token = ownedTokens[i];
-    const fallbackName = token.tokenName || `Token #${token.tokenId}`;
+    if (i > 0) await new Promise(r => setTimeout(r, 200));
 
     try {
-      // Call tokenURI(uint256) via Etherscan proxy
-      const paddedId = BigInt(token.tokenId).toString(16).padStart(64, '0');
-      const ethCallUrl = `https://api.etherscan.io/v2/api?chainid=137&module=proxy&action=eth_call&to=${token.contractAddress}&data=0xc87b56dd${paddedId}&tag=latest&apikey=${apiKey}`;
-      console.log(`[courtyard] tokenURI eth_call for token ${token.tokenId}...`);
-      const ethRes = await fetchWithTimeout(ethCallUrl, {}, 8000);
-      const ethJson = await ethRes.json();
-
-      if (!ethJson.result || ethJson.result === '0x' || ethJson.error) {
-        console.log(`[courtyard] tokenURI call failed for ${token.tokenId}:`, ethJson.error || ethJson.result);
-        throw new Error('empty result');
-      }
-
-      // Decode ABI-encoded string
-      const hex = ethJson.result.replace('0x', '');
-      const offset = parseInt(hex.slice(0, 64), 16) * 2;
-      const length = parseInt(hex.slice(offset, offset + 64), 16);
-      const tokenUri = Buffer.from(hex.slice(offset + 64, offset + 64 + length * 2), 'hex').toString('utf8');
-
-      if (i === 0) console.log(`[courtyard] DEBUG first tokenURI: ${tokenUri}`);
-
-      // Fetch metadata JSON from tokenURI
-      console.log(`[courtyard] Fetching metadata for token ${token.tokenId}...`);
-      const metaRes = await fetchWithTimeout(tokenUri, {}, 5000);
-      if (!metaRes.ok) throw new Error(`metadata HTTP ${metaRes.status}`);
-      const meta = await metaRes.json();
-
-      const name = meta.name || fallbackName;
-      const gradeMatch = name.match(/\((PSA|CGC|BGS|SGC)\s+(\d+(?:\.\d+)?)\s+([^)]+)\)/i);
-      const grade = meta.grade || meta.psa_grade
-        || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || ''))?.value
-        || (gradeMatch ? `${gradeMatch[1]} ${gradeMatch[2]} ${gradeMatch[3]}`.trim() : null);
-
-      cards.push({
-        tokenId: token.tokenId,
-        name,
-        image: meta.image || meta.image_url || null,
-        grade,
-        contractAddress: token.contractAddress,
-        attributes: meta.attributes || [],
-      });
-      console.log(`[courtyard] Got: ${name} | image: ${cards[cards.length - 1].image ? 'yes' : 'null'} | grade: ${grade || 'null'}`);
+      console.log(`[courtyard] [pass 1] token ${token.tokenId} (${i + 1}/${ownedTokens.length})...`);
+      const card = await fetchTokenMetadata(token);
+      cards.push(card);
+      console.log(`[courtyard] [pass 1] OK: ${card.name} | image: ${card.image ? 'yes' : 'null'} | grade: ${card.grade || 'null'}`);
     } catch (err) {
-      console.error(`[courtyard] Error for token ${token.tokenId}:`, err.message);
+      console.error(`[courtyard] [pass 1] FAIL token ${token.tokenId}: ${err.message}`);
+      const fallbackName = token.tokenName || `Token #${token.tokenId}`;
       const gradeMatch = fallbackName.match(/\((PSA|CGC|BGS|SGC)\s+(\d+(?:\.\d+)?)\s+([^)]+)\)/i);
       cards.push({
         tokenId: token.tokenId,
@@ -239,6 +245,33 @@ async function fetchCourtyardCards() {
         attributes: [],
       });
     }
+  }
+
+  // Retry pass: find incomplete cards and retry with 500ms delay
+  const failedIndices = cards
+    .map((card, idx) => isIncomplete(card) ? idx : -1)
+    .filter(idx => idx !== -1);
+
+  if (failedIndices.length > 0) {
+    console.log(`[courtyard] [retry] ${failedIndices.length} incomplete cards, retrying...`);
+    for (let j = 0; j < failedIndices.length; j++) {
+      const idx = failedIndices[j];
+      const token = ownedTokens[idx];
+      if (j > 0) await new Promise(r => setTimeout(r, 500));
+
+      try {
+        console.log(`[courtyard] [retry] token ${token.tokenId} (${j + 1}/${failedIndices.length})...`);
+        const card = await fetchTokenMetadata(token);
+        cards[idx] = card;
+        console.log(`[courtyard] [retry] OK: ${card.name} | image: ${card.image ? 'yes' : 'null'} | grade: ${card.grade || 'null'}`);
+      } catch (err) {
+        console.error(`[courtyard] [retry] FAIL token ${token.tokenId}: ${err.message}`);
+      }
+    }
+  }
+
+  const successCount = cards.filter(c => !isIncomplete(c)).length;
+  console.log(`[courtyard] Done: ${successCount}/${cards.length} cards with full metadata`);
   }
 
   return cards;
