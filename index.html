@@ -163,6 +163,7 @@
     .a-eth  { background:#4F63D2; }
     .a-usdc { background:#2775CA; }
     .a-base { background:#0052FF; }
+    .a-pol { background:#8247E5; }
     .a-name { font-weight:600; color:var(--white); font-size:.88rem; }
     .a-net  { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--muted); letter-spacing:1px; margin-top:1px; }
     td.r   { text-align:right; }
@@ -547,7 +548,7 @@
   </ul>
   <div class="nav-status">
     <span class="live"></span>
-    Base Mainnet
+    Base · Polygon
   </div>
 </nav>
 
@@ -615,7 +616,7 @@
       </div>
       <div class="metric">
         <div class="metric-id">SYS_03</div>
-        <div class="metric-val amber">1</div>
+        <div class="metric-val amber" id="metric-cards-count">1</div>
         <div class="metric-name">Pokémon Cards</div>
         <div class="metric-sub" id="metric-card-sub">$1,200.00 value</div>
       </div>
@@ -651,6 +652,17 @@
           <tr>
             <td><div class="asset-cell"><div class="a-icon a-usdc">USDC</div><div><div class="a-name">USD Coin</div><div class="a-net">BASE · USDC</div></div></div></td>
             <td class="r" id="usdc-amount">850.00</td><td class="r">$1.00</td><td class="val" id="usdc-value">$850.00</td><td class="up">+0.01%</td>
+          </tr>
+          <tr class="table-section-row">
+            <td colspan="5" style="padding:8px 20px;background:var(--panel2);font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Polygon Network</td>
+          </tr>
+          <tr>
+            <td><div class="asset-cell"><div class="a-icon a-pol">POL</div><div><div class="a-name">POL (ex-MATIC)</div><div class="a-net">POLYGON · POL</div></div></div></td>
+            <td class="r" id="pol-amount">0.00</td><td class="r" id="pol-price">$0.00</td><td class="val" id="pol-value">$0.00</td><td class="na">—</td>
+          </tr>
+          <tr>
+            <td><div class="asset-cell"><div class="a-icon a-usdc">USDC</div><div><div class="a-name">USD Coin</div><div class="a-net">POLYGON · USDC</div></div></div></td>
+            <td class="r" id="poly-usdc-amount">0.00</td><td class="r">$1.00</td><td class="val" id="poly-usdc-value">$0.00</td><td class="na">—</td>
           </tr>
         </tbody>
       </table>
@@ -696,7 +708,7 @@
     <div class="collection-stats">
       <div class="cstat">
         <div class="cstat-label">Total Cards</div>
-        <div class="cstat-val amber">1</div>
+        <div class="cstat-val amber" id="cstat-total-cards">1</div>
       </div>
       <div class="cstat">
         <div class="cstat-label">Collection Value</div>
@@ -711,7 +723,7 @@
     <div class="sec">
       <span class="sec-label">All Cards</span>
       <span class="sec-line"></span>
-      <span class="sec-tag">1 Card · PSA Graded</span>
+      <span class="sec-tag" id="collection-count-tag">1 Card · PSA Graded</span>
     </div>
 
     <div class="card-grid">
@@ -858,6 +870,9 @@
   // ─── DETAIL PANEL ───
   function openDetail(idx) {
     const card = CARDS[idx];
+    document.getElementById('d-price').style.color = '';
+    document.getElementById('d-psa-link').style.display = '';
+    document.getElementById('d-courtyard-link').style.display = '';
     document.getElementById('d-title').textContent = card.title;
     const livePrice = document.querySelector('.card-price-val')?.textContent || card.price;
     document.getElementById('d-price').textContent = livePrice;
@@ -936,12 +951,18 @@
 
     // Your Base wallet address (to fetch real ETH/USDC balance)
     WALLET_ADDRESS: '0xe2a31c0285DAb75B461937CA649A79A7A132591F',
+    POLYGON_WALLET: '0x028Edd38341280e3e322D75C09b90E420572d21f',
+    POLYGON_USDC: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
   };
   // ═══════════════════════════════════════════════════
 
   // Shared live balances
   let _ethBal = 0.420;   // updated by fetchWalletBalance
   let _usdcBal = CONFIG.USDC_BALANCE; // updated by fetchWalletBalance
+  let _polBal = 0;
+  let _polyUsdcBal = 0;
+  let _polPrice = 0;
+  let _courtyardCards = [];
 
   // ── LIVE ETH PRICE via Binance (no key, CORS OK) ──
   async function fetchEthPrice() {
@@ -1114,6 +1135,167 @@
     }
   }
 
+  // ── POLYGON WALLET via Polygon RPC ──
+  async function fetchPolygonWallet() {
+    const addr = CONFIG.POLYGON_WALLET.toLowerCase().replace('0x', '');
+    const balanceOfData = '0x70a08231' + addr.padStart(64, '0');
+    try {
+      const [polRes, usdcRes] = await Promise.all([
+        fetch('https://polygon-rpc.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc:'2.0', method:'eth_getBalance', params:[CONFIG.POLYGON_WALLET,'latest'], id:1 })
+        }),
+        fetch('https://polygon-rpc.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc:'2.0', method:'eth_call', params:[{ to:CONFIG.POLYGON_USDC, data:balanceOfData },'latest'], id:2 })
+        })
+      ]);
+      const polData = await polRes.json();
+      const usdcData = await usdcRes.json();
+
+      _polBal = parseInt(polData.result, 16) / 1e18;
+      _polyUsdcBal = parseInt(usdcData.result, 16) / 1e6;
+
+      // Update POL balance in table
+      document.getElementById('pol-amount').textContent = _polBal.toFixed(4);
+      document.getElementById('poly-usdc-amount').textContent = _polyUsdcBal.toFixed(2);
+      document.getElementById('poly-usdc-value').textContent = '$' + _polyUsdcBal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+      // Fetch POL price from Binance
+      try {
+        const priceRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=POLUSDT');
+        const priceData = await priceRes.json();
+        _polPrice = parseFloat(priceData.price);
+        const polValue = _polBal * _polPrice;
+        document.getElementById('pol-price').textContent = '$' + _polPrice.toFixed(4);
+        document.getElementById('pol-value').textContent = '$' + polValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      } catch(e) { console.warn('POL price fetch failed:', e); }
+
+      updateNetWorth(_ethValue);
+    } catch(e) {
+      console.warn('Polygon RPC failed:', e);
+    }
+  }
+
+  // ── COURTYARD CARDS from Railway API ──
+  const COURTYARD_API = 'https://agent-ash-production.up.railway.app/courtyard-cards';
+
+  async function fetchCourtyardCards() {
+    try {
+      const res = await fetch(COURTYARD_API);
+      const data = await res.json();
+      _courtyardCards = data.cards || [];
+      console.log('[Courtyard] Got', _courtyardCards.length, 'cards');
+
+      // Update card counts
+      const totalCards = 1 + _courtyardCards.length; // Pikachu + courtyard
+      const countEl = document.getElementById('metric-cards-count');
+      if (countEl) countEl.textContent = totalCards;
+      const cstatEl = document.getElementById('cstat-total-cards');
+      if (cstatEl) cstatEl.textContent = totalCards;
+      const tagEl = document.getElementById('collection-count-tag');
+      if (tagEl) tagEl.textContent = totalCards + ' Cards · PSA Graded';
+
+      // Render courtyard cards in collection grid
+      renderCourtyardCards();
+    } catch(e) {
+      console.warn('[Courtyard] Fetch failed:', e);
+    }
+  }
+
+  function renderCourtyardCards() {
+    // Add to overview card grid
+    const overviewGrid = document.querySelector('#content-overview .card-grid');
+    // Add to collection card grid
+    const collectionGrid = document.querySelector('#content-collection .card-grid');
+
+    const cardsHtml = _courtyardCards.map((card, i) => {
+      const idx = i + 1; // offset by 1 since Pikachu is index 0
+      const gradeText = card.grade || '—';
+      const imgSrc = card.image || '';
+      const shortName = card.name.replace(/^Courtyard\s*/i, '');
+      return `<div class="p-card" onclick="openCourtyardDetail(${i})">
+        <div class="p-card-media-wrap">
+          ${imgSrc ? `<img class="p-card-media" src="${imgSrc}" alt="${shortName}" />` : `<div class="p-card-media" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">No Image</div>`}
+        </div>
+        <div class="p-card-body">
+          ${gradeText !== '—' ? `<div class="p-card-grade">${gradeText}</div>` : ''}
+          <div class="p-card-name">${shortName}</div>
+          <div class="p-card-value" style="color:var(--muted)">—</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    if (collectionGrid) {
+      // Remove old courtyard cards
+      collectionGrid.querySelectorAll('.courtyard-card').forEach(el => el.remove());
+      collectionGrid.insertAdjacentHTML('beforeend', cardsHtml.replace(/class="p-card"/g, 'class="p-card courtyard-card"'));
+    }
+
+    // Show first 3 in overview
+    if (overviewGrid && _courtyardCards.length > 0) {
+      overviewGrid.querySelectorAll('.courtyard-card').forEach(el => el.remove());
+      const previewHtml = _courtyardCards.slice(0, 3).map((card, i) => {
+        const gradeText = card.grade || '—';
+        const imgSrc = card.image || '';
+        const shortName = card.name.replace(/^Courtyard\s*/i, '');
+        return `<div class="p-card courtyard-card" onclick="openCourtyardDetail(${i})">
+          <div class="p-card-media-wrap">
+            ${imgSrc ? `<img class="p-card-media" src="${imgSrc}" alt="${shortName}" />` : `<div class="p-card-media" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">No Image</div>`}
+          </div>
+          <div class="p-card-body">
+            ${gradeText !== '—' ? `<div class="p-card-grade">${gradeText}</div>` : ''}
+            <div class="p-card-name">${shortName}</div>
+            <div class="p-card-value" style="color:var(--muted)">—</div>
+          </div>
+        </div>`;
+      }).join('');
+      overviewGrid.insertAdjacentHTML('beforeend', previewHtml);
+    }
+  }
+
+  function openCourtyardDetail(idx) {
+    const card = _courtyardCards[idx];
+    if (!card) return;
+    const shortName = card.name.replace(/^Courtyard\s*/i, '');
+    document.getElementById('d-title').textContent = shortName;
+    document.getElementById('d-price').textContent = '—';
+    document.getElementById('d-price').style.color = 'var(--muted)';
+    const dUpd = document.getElementById('d-price-updated');
+    if (dUpd) dUpd.textContent = '';
+    document.getElementById('d-psa-link').style.display = 'none';
+    document.getElementById('d-courtyard-link').style.display = 'none';
+
+    const rows = [
+      { label:'Grade', val: card.grade || '—', highlight: !!card.grade },
+      { label:'Token ID', val: card.tokenId },
+      { label:'Contract', val: card.contractAddress ? card.contractAddress.slice(0,6) + '...' + card.contractAddress.slice(-4) : '—' },
+    ];
+    if (card.attributes && card.attributes.length) {
+      card.attributes.forEach(a => {
+        rows.push({ label: a.trait_type || a.key || 'Attribute', val: a.value || '—' });
+      });
+    }
+    document.getElementById('d-rows').innerHTML = rows.map(r => `
+      <div class="detail-row">
+        <span class="detail-row-label">${r.label}</span>
+        ${r.highlight ? `<span class="grade-badge">${r.val}</span>` : `<span class="detail-row-val">${r.val}</span>`}
+      </div>`).join('');
+
+    const container = document.getElementById('detailMedia');
+    if (card.image) {
+      container.innerHTML = `<img class="p-card-media active" src="${card.image}" alt="${shortName}" />`;
+    } else {
+      container.innerHTML = `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:var(--muted)">No Image Available</div>`;
+    }
+    document.getElementById('mediaTabs').innerHTML = '';
+
+    document.getElementById('detailOverlay').classList.add('open');
+    requestAnimationFrame(() => document.getElementById('detailPanel').classList.add('open'));
+  }
+
   // ── ACTIVITY — Basescan txlist + Blockscout token-transfers ──
   const KNOWN_TOKENS = {
     '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': { symbol: 'USDC', decimals: 6, stable: true },
@@ -1258,12 +1440,12 @@
 
   function updateNetWorth(ethVal) {
     _ethValue = ethVal;
-    const total = _ethValue + _usdcBal + _cardValue; // eth + usdc + cards
+    const polValue = _polBal * _polPrice;
+    const total = _ethValue + _usdcBal + _cardValue + polValue + _polyUsdcBal;
     document.querySelectorAll('.total-worth-val').forEach(el => {
       el.textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     });
-    // Update onchain total
-    const onchain = _ethValue + _usdcBal;
+    const onchain = _ethValue + _usdcBal + polValue + _polyUsdcBal;
     document.querySelectorAll('.onchain-total').forEach(el => {
       el.textContent = '$' + onchain.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     });
@@ -1294,9 +1476,12 @@
   applyCardPrice();
   fetchWalletBalance();
   fetchActivity();
+  fetchPolygonWallet();
+  fetchCourtyardCards();
   // Refresh ETH price + wallet balance every 60s
   setInterval(fetchEthPrice, 60000);
   setInterval(fetchWalletBalance, 60000);
+  setInterval(fetchPolygonWallet, 60000);
 </script>
 </body>
 </html>
