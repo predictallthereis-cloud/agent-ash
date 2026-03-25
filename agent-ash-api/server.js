@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const puppeteer = require('puppeteer');
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -204,7 +205,7 @@ app.get('/courtyard-cards', async (req, res) => {
     const cards = await fetchCourtyardCards();
     res.json({ count: cards.length, cards });
   } catch (err) {
-    console.error('[courtyard] Endpoint error:', err.message);
+    console.error('[courtyard] Endpoint error:', err.message, err.stack);
     res.status(500).json({ error: err.message });
   }
 });
