@@ -176,23 +176,69 @@ async function fetchCourtyardCards() {
 
   if (ownedTokens.length === 0) return [];
 
-  // Extract card info from tokenName (no external metadata needed)
-  console.log(`[courtyard] Building card list from ${ownedTokens.length} tokens...`);
+  // Fetch tokenURI + metadata for each token via Etherscan eth_call
+  console.log(`[courtyard] Fetching metadata for ${ownedTokens.length} tokens...`);
+  const apiKey = process.env.POLYGONSCAN_API_KEY || '';
   const cards = [];
 
-  for (const token of ownedTokens) {
-    const name = token.tokenName || `Token #${token.tokenId}`;
-    const gradeMatch = name.match(/\((PSA|CGC|BGS|SGC)\s+(\d+(?:\.\d+)?)\s+([^)]+)\)/i);
-    const grade = gradeMatch ? `${gradeMatch[1]} ${gradeMatch[2]} ${gradeMatch[3]}`.trim() : null;
+  for (let i = 0; i < ownedTokens.length; i++) {
+    const token = ownedTokens[i];
+    const fallbackName = token.tokenName || `Token #${token.tokenId}`;
 
-    cards.push({
-      tokenId: token.tokenId,
-      name,
-      image: null,
-      grade,
-      contractAddress: token.contractAddress,
-    });
-    console.log(`[courtyard] Card: ${name} | grade: ${grade || 'null'}`);
+    try {
+      // Call tokenURI(uint256) via Etherscan proxy
+      const paddedId = BigInt(token.tokenId).toString(16).padStart(64, '0');
+      const ethCallUrl = `https://api.etherscan.io/v2/api?chainid=137&module=proxy&action=eth_call&to=${token.contractAddress}&data=0xc87b56dd${paddedId}&tag=latest&apikey=${apiKey}`;
+      console.log(`[courtyard] tokenURI eth_call for token ${token.tokenId}...`);
+      const ethRes = await fetchWithTimeout(ethCallUrl, {}, 8000);
+      const ethJson = await ethRes.json();
+
+      if (!ethJson.result || ethJson.result === '0x' || ethJson.error) {
+        console.log(`[courtyard] tokenURI call failed for ${token.tokenId}:`, ethJson.error || ethJson.result);
+        throw new Error('empty result');
+      }
+
+      // Decode ABI-encoded string
+      const hex = ethJson.result.replace('0x', '');
+      const offset = parseInt(hex.slice(0, 64), 16) * 2;
+      const length = parseInt(hex.slice(offset, offset + 64), 16);
+      const tokenUri = Buffer.from(hex.slice(offset + 64, offset + 64 + length * 2), 'hex').toString('utf8');
+
+      if (i === 0) console.log(`[courtyard] DEBUG first tokenURI: ${tokenUri}`);
+
+      // Fetch metadata JSON from tokenURI
+      console.log(`[courtyard] Fetching metadata for token ${token.tokenId}...`);
+      const metaRes = await fetchWithTimeout(tokenUri, {}, 5000);
+      if (!metaRes.ok) throw new Error(`metadata HTTP ${metaRes.status}`);
+      const meta = await metaRes.json();
+
+      const name = meta.name || fallbackName;
+      const gradeMatch = name.match(/\((PSA|CGC|BGS|SGC)\s+(\d+(?:\.\d+)?)\s+([^)]+)\)/i);
+      const grade = meta.grade || meta.psa_grade
+        || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || ''))?.value
+        || (gradeMatch ? `${gradeMatch[1]} ${gradeMatch[2]} ${gradeMatch[3]}`.trim() : null);
+
+      cards.push({
+        tokenId: token.tokenId,
+        name,
+        image: meta.image || meta.image_url || null,
+        grade,
+        contractAddress: token.contractAddress,
+        attributes: meta.attributes || [],
+      });
+      console.log(`[courtyard] Got: ${name} | image: ${cards[cards.length - 1].image ? 'yes' : 'null'} | grade: ${grade || 'null'}`);
+    } catch (err) {
+      console.error(`[courtyard] Error for token ${token.tokenId}:`, err.message);
+      const gradeMatch = fallbackName.match(/\((PSA|CGC|BGS|SGC)\s+(\d+(?:\.\d+)?)\s+([^)]+)\)/i);
+      cards.push({
+        tokenId: token.tokenId,
+        name: fallbackName,
+        image: null,
+        grade: gradeMatch ? `${gradeMatch[1]} ${gradeMatch[2]} ${gradeMatch[3]}`.trim() : null,
+        contractAddress: token.contractAddress,
+        attributes: [],
+      });
+    }
   }
 
   return cards;
