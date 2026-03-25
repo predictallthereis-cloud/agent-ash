@@ -112,7 +112,6 @@ async function scrapePrice() {
 }
 
 // ── COURTYARD NFT HELPERS ──
-const COURTYARD_CONTRACT = '0x581425c638882bd8169dae6f2995878927c9fe70';
 const NFT_WALLET = '0x028Edd38341280e3e322D75C09b90E420572d21f';
 const FETCH_TIMEOUT = 10000;
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
@@ -120,9 +119,8 @@ const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 const POLYGONSCAN_URL = 'https://api.etherscan.io/v2/api'
   + '?chainid=137'
   + '&module=account&action=tokennfttx'
-  + `&contractaddress=${COURTYARD_CONTRACT}`
   + `&address=${NFT_WALLET}`
-  + '&page=1&offset=100&sort=desc'
+  + '&page=1&offset=200&sort=desc'
   + `&apikey=${process.env.POLYGONSCAN_API_KEY || ''}`;
 
 // In-memory cards cache
@@ -146,14 +144,20 @@ async function fetchCourtyardCards() {
     throw new Error(`PolygonScan: ${txData.message || 'no results'}`);
   }
 
-  console.log(`[courtyard] Got ${txData.result.length} NFT transfers`);
+  console.log(`[courtyard] Got ${txData.result.length} total NFT transfers`);
+
+  // Filter for Courtyard NFTs only
+  const courtyardTxs = txData.result.filter(tx =>
+    (tx.tokenName || '').toLowerCase().includes('courtyard')
+  );
+  console.log(`[courtyard] ${courtyardTxs.length} Courtyard transfers`);
 
   // Determine which tokenIDs are currently held (received - sent)
   const wallet = NFT_WALLET.toLowerCase();
   const held = new Map();
 
   // Process oldest-first to track current state
-  const transfers = txData.result.reverse();
+  const transfers = courtyardTxs.reverse();
   for (const tx of transfers) {
     const tokenId = tx.tokenID;
     if (tx.to.toLowerCase() === wallet) {
