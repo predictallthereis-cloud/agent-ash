@@ -1136,27 +1136,17 @@
   }
 
   // ── POLYGON WALLET via Polygon RPC ──
-  async function fetchPolygonWallet() {
-    const addr = CONFIG.POLYGON_WALLET.toLowerCase().replace('0x', '');
-    const balanceOfData = '0x70a08231' + addr.padStart(64, '0');
-    try {
-      const [polRes, usdcRes] = await Promise.all([
-        fetch('https://polygon-rpc.com', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc:'2.0', method:'eth_getBalance', params:[CONFIG.POLYGON_WALLET,'latest'], id:1 })
-        }),
-        fetch('https://polygon-rpc.com', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc:'2.0', method:'eth_call', params:[{ to:CONFIG.POLYGON_USDC, data:balanceOfData },'latest'], id:2 })
-        })
-      ]);
-      const polData = await polRes.json();
-      const usdcData = await usdcRes.json();
+  // ── POLYGON WALLET via Railway backend (avoids CORS on polygon-rpc.com) ──
+  const POLYGON_BALANCE_API = 'https://agent-ash-production.up.railway.app/polygon-balance';
 
-      _polBal = parseInt(polData.result, 16) / 1e18;
-      _polyUsdcBal = parseInt(usdcData.result, 16) / 1e6;
+  async function fetchPolygonWallet() {
+    try {
+      // Fetch balances from backend (server-side RPC call)
+      const res = await fetch(POLYGON_BALANCE_API);
+      const data = await res.json();
+
+      _polBal = data.pol || 0;
+      _polyUsdcBal = data.usdc || 0;
 
       // Update POL balance in table
       document.getElementById('pol-amount').textContent = _polBal.toFixed(4);
@@ -1175,7 +1165,7 @@
 
       updateNetWorth(_ethValue);
     } catch(e) {
-      console.warn('Polygon RPC failed:', e);
+      console.warn('Polygon balance fetch failed:', e);
     }
   }
 

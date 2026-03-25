@@ -301,6 +301,47 @@ app.get('/courtyard-cards', (req, res) => {
   res.json(cachedCards);
 });
 
+// ── POLYGON BALANCE (server-side to avoid CORS) ──
+const POLYGON_RPC = 'https://polygon-rpc.com';
+const POLYGON_WALLET_ADDR = '0x028Edd38341280e3e322D75C09b90E420572d21f';
+const POLYGON_USDC_CONTRACT = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+
+app.get('/polygon-balance', async (req, res) => {
+  const addr = POLYGON_WALLET_ADDR.toLowerCase().replace('0x', '');
+  const balanceOfData = '0x70a08231' + addr.padStart(64, '0');
+
+  try {
+    const [polRes, usdcRes] = await Promise.all([
+      fetch(POLYGON_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_getBalance', params: [POLYGON_WALLET_ADDR, 'latest'], id: 1 }),
+      }),
+      fetch(POLYGON_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: POLYGON_USDC_CONTRACT, data: balanceOfData }, 'latest'], id: 2 }),
+      }),
+    ]);
+
+    const polData = await polRes.json();
+    const usdcData = await usdcRes.json();
+
+    // Parse with BigInt to handle large hex values safely
+    const polWei = BigInt(polData.result || '0x0');
+    const polBal = Number(polWei) / 1e18;
+
+    const usdcRaw = BigInt(usdcData.result || '0x0');
+    const usdcBal = Number(usdcRaw) / 1e6;
+
+    console.log(`[polygon] POL: ${polBal.toFixed(4)}, USDC: ${usdcBal.toFixed(2)}`);
+    res.json({ pol: polBal, usdc: usdcBal, updated: new Date().toISOString() });
+  } catch (err) {
+    console.error('[polygon] Balance fetch failed:', err.message);
+    res.status(500).json({ error: err.message, pol: 0, usdc: 0 });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', lastUpdate: cachedPrice.updated });
 });
