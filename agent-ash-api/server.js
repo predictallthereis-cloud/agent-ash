@@ -110,9 +110,103 @@ async function scrapePrice() {
   }
 }
 
+// ── POLYGON RPC HELPERS ──
+const POLYGON_RPC = 'https://polygon-rpc.com';
+const COURTYARD_CONTRACT = '0x581425c638882bd8169dae6f2995878927c9fe70';
+const NFT_WALLET = '0x028Edd38341280e3e322D75C09b90E420572d21f';
+
+async function polygonCall(data) {
+  const res = await fetch(POLYGON_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [data, 'latest'] }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+  return json.result;
+}
+
+function padAddress(addr) {
+  return addr.toLowerCase().replace('0x', '').padStart(64, '0');
+}
+
+function padUint256(n) {
+  return n.toString(16).padStart(64, '0');
+}
+
+async function fetchCourtyardCards() {
+  const wallet = padAddress(NFT_WALLET);
+
+  // 1. balanceOf(address) — 0x70a08231
+  const balanceHex = await polygonCall({
+    to: COURTYARD_CONTRACT,
+    data: '0x70a08231' + wallet,
+  });
+  const balance = parseInt(balanceHex, 16);
+  console.log(`[courtyard] Wallet holds ${balance} NFTs`);
+
+  if (balance === 0) return [];
+
+  // 2. tokenOfOwnerByIndex(address, index) — 0x2f745c59
+  const tokenIds = [];
+  for (let i = 0; i < balance; i++) {
+    const result = await polygonCall({
+      to: COURTYARD_CONTRACT,
+      data: '0x2f745c59' + wallet + padUint256(i),
+    });
+    tokenIds.push(BigInt(result).toString());
+  }
+  console.log(`[courtyard] Token IDs:`, tokenIds);
+
+  // 3. tokenURI(uint256) — 0xc87b56dd for each token
+  const cards = [];
+  for (const tokenId of tokenIds) {
+    try {
+      const uriHex = await polygonCall({
+        to: COURTYARD_CONTRACT,
+        data: '0xc87b56dd' + padUint256(Number(tokenId)),
+      });
+
+      // Decode ABI-encoded string: offset (32 bytes) + length (32 bytes) + data
+      const stripped = uriHex.replace('0x', '');
+      const offset = parseInt(stripped.slice(0, 64), 16) * 2;
+      const length = parseInt(stripped.slice(offset, offset + 64), 16);
+      const hexStr = stripped.slice(offset + 64, offset + 64 + length * 2);
+      const uri = Buffer.from(hexStr, 'hex').toString('utf8');
+
+      // Fetch metadata JSON
+      const metaRes = await fetch(uri);
+      const meta = await metaRes.json();
+
+      cards.push({
+        tokenId,
+        name: meta.name || `Token #${tokenId}`,
+        image: meta.image || null,
+        grade: meta.attributes?.find(a => /grade|psa/i.test(a.trait_type))?.value || null,
+        attributes: meta.attributes || [],
+      });
+    } catch (err) {
+      console.error(`[courtyard] Error fetching token ${tokenId}:`, err.message);
+      cards.push({ tokenId, name: `Token #${tokenId}`, image: null, grade: null, attributes: [] });
+    }
+  }
+
+  return cards;
+}
+
 // ── ROUTES ──
 app.get('/price', (req, res) => {
   res.json(cachedPrice);
+});
+
+app.get('/courtyard-cards', async (req, res) => {
+  try {
+    const cards = await fetchCourtyardCards();
+    res.json({ count: cards.length, cards });
+  } catch (err) {
+    console.error('[courtyard] Endpoint error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/health', (req, res) => {
