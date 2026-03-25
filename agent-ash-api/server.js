@@ -194,7 +194,6 @@ async function fetchCourtyardCards() {
     });
     console.log(`[courtyard] Card: ${name} | grade: ${grade || 'null'}`);
   }
-  }
 
   return cards;
 }
