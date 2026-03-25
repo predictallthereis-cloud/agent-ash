@@ -111,115 +111,104 @@ async function scrapePrice() {
   }
 }
 
-// ── POLYGON RPC HELPERS ──
-const POLYGON_RPCS = [
-  'https://polygon-rpc.com',
-  'https://rpc-mainnet.matic.network',
-];
+// ── COURTYARD NFT HELPERS ──
 const COURTYARD_CONTRACT = '0x581425c638882bd8169dae6f2995878927c9fe70';
 const NFT_WALLET = '0x028Edd38341280e3e322D75C09b90E420572d21f';
-const RPC_TIMEOUT = 10000; // 10 seconds
+const FETCH_TIMEOUT = 8000; // 8 seconds
 
-async function polygonCall(data) {
-  let lastErr;
-  for (const rpc of POLYGON_RPCS) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), RPC_TIMEOUT);
+const POLYGONSCAN_URL = 'https://api.polygonscan.com/api'
+  + '?module=account&action=tokennfttx'
+  + `&contractaddress=${COURTYARD_CONTRACT}`
+  + `&address=${NFT_WALLET}`
+  + '&page=1&offset=100&sort=desc';
 
-      console.log(`[courtyard] RPC call to ${rpc} — data: ${data.data.slice(0, 10)}...`);
-      const res = await fetch(rpc, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [data, 'latest'] }),
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-
-      const json = await res.json();
-      if (json.error) throw new Error(json.error.message);
-      console.log(`[courtyard] RPC success from ${rpc}`);
-      return json.result;
-    } catch (err) {
-      lastErr = err;
-      console.error(`[courtyard] RPC ${rpc} failed: ${err.name === 'AbortError' ? 'TIMEOUT (10s)' : err.message}`);
-    }
-  }
-  throw new Error(`All Polygon RPCs failed. Last error: ${lastErr.message}`);
-}
-
-function padAddress(addr) {
-  return addr.toLowerCase().replace('0x', '').padStart(64, '0');
-}
-
-function padUint256(n) {
-  return n.toString(16).padStart(64, '0');
+function fetchWithTimeout(url, opts = {}, timeout = FETCH_TIMEOUT) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...opts, signal: controller.signal })
+    .finally(() => clearTimeout(timer));
 }
 
 async function fetchCourtyardCards() {
-  const wallet = padAddress(NFT_WALLET);
+  // 1. Get NFT transfer history from PolygonScan
+  console.log('[courtyard] Step 1: Fetching NFT transfers from PolygonScan...');
+  const txRes = await fetchWithTimeout(POLYGONSCAN_URL);
+  const txData = await txRes.json();
 
-  // 1. balanceOf(address) — 0x70a08231
-  console.log('[courtyard] Step 1: Calling balanceOf...');
-  const balanceHex = await polygonCall({
-    to: COURTYARD_CONTRACT,
-    data: '0x70a08231' + wallet,
-  });
-  const balance = parseInt(balanceHex, 16);
-  console.log(`[courtyard] Wallet holds ${balance} NFTs`);
-
-  if (balance === 0) return [];
-
-  // 2. tokenOfOwnerByIndex(address, index) — 0x2f745c59
-  console.log(`[courtyard] Step 2: Fetching ${balance} token IDs...`);
-  const tokenIds = [];
-  for (let i = 0; i < balance; i++) {
-    console.log(`[courtyard] tokenOfOwnerByIndex(${i}/${balance})...`);
-    const result = await polygonCall({
-      to: COURTYARD_CONTRACT,
-      data: '0x2f745c59' + wallet + padUint256(i),
-    });
-    tokenIds.push(BigInt(result).toString());
+  if (txData.status !== '1' || !Array.isArray(txData.result)) {
+    console.error('[courtyard] PolygonScan error:', txData.message || txData.result);
+    throw new Error(`PolygonScan: ${txData.message || 'no results'}`);
   }
-  console.log(`[courtyard] Token IDs:`, tokenIds);
 
-  // 3. tokenURI(uint256) — 0xc87b56dd for each token
-  console.log(`[courtyard] Step 3: Fetching metadata for ${tokenIds.length} tokens...`);
-  const cards = [];
-  for (const tokenId of tokenIds) {
-    try {
-      console.log(`[courtyard] tokenURI(${tokenId})...`);
-      const uriHex = await polygonCall({
-        to: COURTYARD_CONTRACT,
-        data: '0xc87b56dd' + padUint256(Number(tokenId)),
-      });
+  console.log(`[courtyard] Got ${txData.result.length} NFT transfers`);
 
-      // Decode ABI-encoded string: offset (32 bytes) + length (32 bytes) + data
-      const stripped = uriHex.replace('0x', '');
-      const offset = parseInt(stripped.slice(0, 64), 16) * 2;
-      const length = parseInt(stripped.slice(offset, offset + 64), 16);
-      const hexStr = stripped.slice(offset + 64, offset + 64 + length * 2);
-      const uri = Buffer.from(hexStr, 'hex').toString('utf8');
-      console.log(`[courtyard] Fetching metadata from: ${uri}`);
+  // 2. Determine which tokenIDs are currently held (received - sent)
+  const wallet = NFT_WALLET.toLowerCase();
+  const held = new Map(); // tokenID -> last transfer info
 
-      // Fetch metadata JSON with timeout
-      const metaController = new AbortController();
-      const metaTimer = setTimeout(() => metaController.abort(), RPC_TIMEOUT);
-      const metaRes = await fetch(uri, { signal: metaController.signal });
-      clearTimeout(metaTimer);
-      const meta = await metaRes.json();
-
-      cards.push({
+  // Process oldest-first to track current state
+  const transfers = txData.result.reverse();
+  for (const tx of transfers) {
+    const tokenId = tx.tokenID;
+    if (tx.to.toLowerCase() === wallet) {
+      // Received
+      held.set(tokenId, {
         tokenId,
-        name: meta.name || `Token #${tokenId}`,
-        image: meta.image || null,
-        grade: meta.attributes?.find(a => /grade|psa/i.test(a.trait_type))?.value || null,
-        attributes: meta.attributes || [],
+        tokenName: tx.tokenName,
+        contractAddress: tx.contractAddress,
+        hash: tx.hash,
       });
-      console.log(`[courtyard] Got card: ${meta.name || tokenId}`);
+    } else if (tx.from.toLowerCase() === wallet) {
+      // Sent away
+      held.delete(tokenId);
+    }
+  }
+
+  const ownedTokens = [...held.values()];
+  console.log(`[courtyard] Currently holds ${ownedTokens.length} NFTs:`, ownedTokens.map(t => t.tokenId));
+
+  if (ownedTokens.length === 0) return [];
+
+  // 3. Try to fetch metadata for each token
+  console.log(`[courtyard] Step 2: Fetching metadata for ${ownedTokens.length} tokens...`);
+  const cards = [];
+
+  for (const token of ownedTokens) {
+    try {
+      // Try Courtyard API first
+      const metaUrl = `https://api.courtyard.io/v1/assets/${token.tokenId}`;
+      console.log(`[courtyard] Fetching metadata: ${metaUrl}`);
+      const metaRes = await fetchWithTimeout(metaUrl, {}, 5000);
+
+      if (metaRes.ok) {
+        const meta = await metaRes.json();
+        cards.push({
+          tokenId: token.tokenId,
+          name: meta.name || meta.title || token.tokenName || `Token #${token.tokenId}`,
+          image: meta.image || meta.image_url || null,
+          grade: meta.grade || meta.psa_grade || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || a.key || ''))?.value || null,
+          attributes: meta.attributes || [],
+        });
+        console.log(`[courtyard] Got card: ${cards[cards.length - 1].name}`);
+      } else {
+        console.log(`[courtyard] Courtyard API returned ${metaRes.status} for token ${token.tokenId}, using transfer data`);
+        cards.push({
+          tokenId: token.tokenId,
+          name: token.tokenName || `Token #${token.tokenId}`,
+          image: null,
+          grade: null,
+          attributes: [],
+        });
+      }
     } catch (err) {
-      console.error(`[courtyard] Error fetching token ${tokenId}:`, err.message, err.stack);
-      cards.push({ tokenId, name: `Token #${tokenId}`, image: null, grade: null, attributes: [] });
+      console.error(`[courtyard] Metadata error for token ${token.tokenId}:`, err.message);
+      cards.push({
+        tokenId: token.tokenId,
+        name: token.tokenName || `Token #${token.tokenId}`,
+        image: null,
+        grade: null,
+        attributes: [],
+      });
     }
   }
 
