@@ -272,7 +272,6 @@ async function fetchCourtyardCards() {
 
   const successCount = cards.filter(c => !isIncomplete(c)).length;
   console.log(`[courtyard] Done: ${successCount}/${cards.length} cards with full metadata`);
-  }
 
   return cards;
 }
