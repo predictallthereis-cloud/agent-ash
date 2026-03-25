@@ -180,32 +180,51 @@ async function fetchCourtyardCards() {
   console.log(`[courtyard] Fetching metadata for ${ownedTokens.length} tokens...`);
   const cards = [];
 
-  for (const token of ownedTokens) {
-    try {
-      const metaUrl = `https://api.courtyard.io/v1/assets/${token.tokenId}`;
-      console.log(`[courtyard] Metadata: ${metaUrl}`);
-      const metaRes = await fetchWithTimeout(metaUrl, {}, 5000);
+  const META_URLS = [
+    id => `https://api.courtyard.io/assets/${id}`,
+    id => `https://courtyard.io/api/assets/${id}`,
+  ];
 
-      if (metaRes.ok) {
-        const meta = await metaRes.json();
-        cards.push({
-          tokenId: token.tokenId,
-          name: meta.name || meta.title || token.tokenName || `Token #${token.tokenId}`,
-          image: meta.image || meta.image_url || null,
-          grade: meta.grade || meta.psa_grade || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || a.key || ''))?.value || null,
-          attributes: meta.attributes || [],
-        });
-        console.log(`[courtyard] Got card: ${cards[cards.length - 1].name}`);
-      } else {
-        console.log(`[courtyard] Courtyard API returned ${metaRes.status} for token ${token.tokenId}`);
-        cards.push({
-          tokenId: token.tokenId,
-          name: token.tokenName || `Token #${token.tokenId}`,
-          image: null, grade: null, attributes: [],
-        });
+  for (let i = 0; i < ownedTokens.length; i++) {
+    const token = ownedTokens[i];
+    let gotMeta = false;
+
+    for (const urlFn of META_URLS) {
+      try {
+        const metaUrl = urlFn(token.tokenId);
+        console.log(`[courtyard] Trying metadata: ${metaUrl}`);
+        const metaRes = await fetchWithTimeout(metaUrl, {}, 5000);
+
+        // Log details for the first token to debug response format
+        if (i === 0) {
+          const bodyText = await metaRes.clone().text();
+          console.log(`[courtyard] DEBUG first token — status: ${metaRes.status}, body (200 chars): ${bodyText.slice(0, 200)}`);
+        }
+
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          cards.push({
+            tokenId: token.tokenId,
+            name: meta.name || meta.title || token.tokenName || `Token #${token.tokenId}`,
+            image: meta.image || meta.image_url || meta.imageUrl || null,
+            grade: meta.grade || meta.psa_grade || meta.psaGrade
+              || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || a.key || ''))?.value
+              || meta.traits?.find(t => /grade|psa/i.test(t.trait_type || t.key || ''))?.value
+              || null,
+            attributes: meta.attributes || meta.traits || [],
+          });
+          console.log(`[courtyard] Got card: ${cards[cards.length - 1].name} | image: ${cards[cards.length - 1].image ? 'yes' : 'null'} | grade: ${cards[cards.length - 1].grade || 'null'}`);
+          gotMeta = true;
+          break;
+        } else {
+          console.log(`[courtyard] ${metaUrl} returned ${metaRes.status}`);
+        }
+      } catch (err) {
+        console.error(`[courtyard] ${urlFn(token.tokenId)} failed:`, err.message);
       }
-    } catch (err) {
-      console.error(`[courtyard] Metadata error for token ${token.tokenId}:`, err.message);
+    }
+
+    if (!gotMeta) {
       cards.push({
         tokenId: token.tokenId,
         name: token.tokenName || `Token #${token.tokenId}`,
