@@ -117,6 +117,13 @@ const NFT_WALLET = '0x028Edd38341280e3e322D75C09b90E420572d21f';
 const FETCH_TIMEOUT = 10000;
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
+const POLYGONSCAN_URL = 'https://api.polygonscan.com/api'
+  + '?module=account&action=tokennfttx'
+  + `&contractaddress=${COURTYARD_CONTRACT}`
+  + `&address=${NFT_WALLET}`
+  + '&page=1&offset=100&sort=desc'
+  + `&apikey=${process.env.POLYGONSCAN_API_KEY || ''}`;
+
 // In-memory cards cache
 let cachedCards = { count: 0, cards: [], source: 'none', updated: null };
 
@@ -127,84 +134,95 @@ function fetchWithTimeout(url, opts = {}, timeout = FETCH_TIMEOUT) {
     .finally(() => clearTimeout(timer));
 }
 
-function parseOpenSeaNFTs(data) {
-  if (!data.nfts || !Array.isArray(data.nfts)) return [];
-  return data.nfts.map(nft => ({
-    tokenId: nft.identifier || nft.token_id,
-    name: nft.name || nft.title || `Token #${nft.identifier || nft.token_id}`,
-    image: nft.image_url || nft.display_image_url || nft.metadata?.image || null,
-    grade: nft.traits?.find(t => /grade|psa/i.test(t.trait_type || ''))?.value
-      || nft.metadata?.attributes?.find(a => /grade|psa/i.test(a.trait_type || ''))?.value
-      || null,
-    attributes: nft.traits || nft.metadata?.attributes || [],
-  }));
-}
-
-function parseAlchemyNFTs(data) {
-  if (!data.ownedNfts || !Array.isArray(data.ownedNfts)) return [];
-  return data.ownedNfts.map(nft => ({
-    tokenId: nft.tokenId,
-    name: nft.name || nft.title || nft.raw?.metadata?.name || `Token #${nft.tokenId}`,
-    image: nft.image?.cachedUrl || nft.image?.originalUrl || nft.raw?.metadata?.image || null,
-    grade: nft.raw?.metadata?.attributes?.find(a => /grade|psa/i.test(a.trait_type || ''))?.value || null,
-    attributes: nft.raw?.metadata?.attributes || [],
-  }));
-}
-
 async function fetchCourtyardCards() {
-  // Strategy 1: OpenSea API (no key required)
-  try {
-    const openSeaUrl = `https://api.opensea.io/api/v2/chain/matic/account/${NFT_WALLET}/nfts?collection=courtyard-io&limit=50`;
-    console.log('[courtyard] Trying OpenSea API...');
-    const res = await fetchWithTimeout(openSeaUrl, {
-      headers: { 'accept': 'application/json' },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const cards = parseOpenSeaNFTs(data);
-      console.log(`[courtyard] OpenSea returned ${cards.length} NFTs`);
-      if (cards.length > 0) return { source: 'opensea', cards };
-    } else {
-      console.log(`[courtyard] OpenSea returned ${res.status}: ${await res.text().catch(() => '')}`);
-    }
-  } catch (err) {
-    console.error('[courtyard] OpenSea failed:', err.message);
+  // Get NFT transfer history from PolygonScan
+  console.log('[courtyard] Fetching NFT transfers from PolygonScan...');
+  const txRes = await fetchWithTimeout(POLYGONSCAN_URL);
+  const txData = await txRes.json();
+
+  if (txData.status !== '1' || !Array.isArray(txData.result)) {
+    console.error('[courtyard] PolygonScan error:', txData.message || txData.result);
+    throw new Error(`PolygonScan: ${txData.message || 'no results'}`);
   }
 
-  // Strategy 2: Alchemy free NFT API
-  try {
-    const alchemyUrl = `https://polygon-mainnet.g.alchemy.com/nft/v3/demo/getNFTsForOwner`
-      + `?owner=${NFT_WALLET}`
-      + `&contractAddresses[]=${COURTYARD_CONTRACT}`
-      + `&withMetadata=true`;
-    console.log('[courtyard] Trying Alchemy API...');
-    const res = await fetchWithTimeout(alchemyUrl);
-    if (res.ok) {
-      const data = await res.json();
-      const cards = parseAlchemyNFTs(data);
-      console.log(`[courtyard] Alchemy returned ${cards.length} NFTs`);
-      if (cards.length > 0) return { source: 'alchemy', cards };
-    } else {
-      console.log(`[courtyard] Alchemy returned ${res.status}: ${await res.text().catch(() => '')}`);
+  console.log(`[courtyard] Got ${txData.result.length} NFT transfers`);
+
+  // Determine which tokenIDs are currently held (received - sent)
+  const wallet = NFT_WALLET.toLowerCase();
+  const held = new Map();
+
+  // Process oldest-first to track current state
+  const transfers = txData.result.reverse();
+  for (const tx of transfers) {
+    const tokenId = tx.tokenID;
+    if (tx.to.toLowerCase() === wallet) {
+      held.set(tokenId, {
+        tokenId,
+        tokenName: tx.tokenName,
+        contractAddress: tx.contractAddress,
+      });
+    } else if (tx.from.toLowerCase() === wallet) {
+      held.delete(tokenId);
     }
-  } catch (err) {
-    console.error('[courtyard] Alchemy failed:', err.message);
   }
 
-  throw new Error('All NFT API sources failed (OpenSea, Alchemy)');
+  const ownedTokens = [...held.values()];
+  console.log(`[courtyard] Currently holds ${ownedTokens.length} NFTs:`, ownedTokens.map(t => t.tokenId));
+
+  if (ownedTokens.length === 0) return [];
+
+  // Try to fetch metadata for each token
+  console.log(`[courtyard] Fetching metadata for ${ownedTokens.length} tokens...`);
+  const cards = [];
+
+  for (const token of ownedTokens) {
+    try {
+      const metaUrl = `https://api.courtyard.io/v1/assets/${token.tokenId}`;
+      console.log(`[courtyard] Metadata: ${metaUrl}`);
+      const metaRes = await fetchWithTimeout(metaUrl, {}, 5000);
+
+      if (metaRes.ok) {
+        const meta = await metaRes.json();
+        cards.push({
+          tokenId: token.tokenId,
+          name: meta.name || meta.title || token.tokenName || `Token #${token.tokenId}`,
+          image: meta.image || meta.image_url || null,
+          grade: meta.grade || meta.psa_grade || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || a.key || ''))?.value || null,
+          attributes: meta.attributes || [],
+        });
+        console.log(`[courtyard] Got card: ${cards[cards.length - 1].name}`);
+      } else {
+        console.log(`[courtyard] Courtyard API returned ${metaRes.status} for token ${token.tokenId}`);
+        cards.push({
+          tokenId: token.tokenId,
+          name: token.tokenName || `Token #${token.tokenId}`,
+          image: null, grade: null, attributes: [],
+        });
+      }
+    } catch (err) {
+      console.error(`[courtyard] Metadata error for token ${token.tokenId}:`, err.message);
+      cards.push({
+        tokenId: token.tokenId,
+        name: token.tokenName || `Token #${token.tokenId}`,
+        image: null, grade: null, attributes: [],
+      });
+    }
+  }
+
+  return cards;
 }
 
 async function refreshCards() {
   console.log('[courtyard] Refreshing cards cache...');
   try {
-    const result = await fetchCourtyardCards();
+    const cards = await fetchCourtyardCards();
     cachedCards = {
-      count: result.cards.length,
-      cards: result.cards,
-      source: result.source,
+      count: cards.length,
+      cards,
+      source: 'polygonscan',
       updated: new Date().toISOString(),
     };
-    console.log(`[courtyard] Cache updated: ${cachedCards.count} cards from ${cachedCards.source}`);
+    console.log(`[courtyard] Cache updated: ${cachedCards.count} cards`);
   } catch (err) {
     console.error('[courtyard] Refresh failed:', err.message, err.stack);
   }
