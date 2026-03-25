@@ -117,8 +117,9 @@ const NFT_WALLET = '0x028Edd38341280e3e322D75C09b90E420572d21f';
 const FETCH_TIMEOUT = 10000;
 const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
-const POLYGONSCAN_URL = 'https://api.polygonscan.com/api'
-  + '?module=account&action=tokennfttx'
+const POLYGONSCAN_URL = 'https://api.etherscan.io/v2/api'
+  + '?chainid=137'
+  + '&module=account&action=tokennfttx'
   + `&contractaddress=${COURTYARD_CONTRACT}`
   + `&address=${NFT_WALLET}`
   + '&page=1&offset=100&sort=desc'
