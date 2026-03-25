@@ -112,19 +112,40 @@ async function scrapePrice() {
 }
 
 // ── POLYGON RPC HELPERS ──
-const POLYGON_RPC = 'https://polygon-rpc.com';
+const POLYGON_RPCS = [
+  'https://polygon-rpc.com',
+  'https://rpc-mainnet.matic.network',
+];
 const COURTYARD_CONTRACT = '0x581425c638882bd8169dae6f2995878927c9fe70';
 const NFT_WALLET = '0x028Edd38341280e3e322D75C09b90E420572d21f';
+const RPC_TIMEOUT = 10000; // 10 seconds
 
 async function polygonCall(data) {
-  const res = await fetch(POLYGON_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [data, 'latest'] }),
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(json.error.message);
-  return json.result;
+  let lastErr;
+  for (const rpc of POLYGON_RPCS) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), RPC_TIMEOUT);
+
+      console.log(`[courtyard] RPC call to ${rpc} — data: ${data.data.slice(0, 10)}...`);
+      const res = await fetch(rpc, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [data, 'latest'] }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      console.log(`[courtyard] RPC success from ${rpc}`);
+      return json.result;
+    } catch (err) {
+      lastErr = err;
+      console.error(`[courtyard] RPC ${rpc} failed: ${err.name === 'AbortError' ? 'TIMEOUT (10s)' : err.message}`);
+    }
+  }
+  throw new Error(`All Polygon RPCs failed. Last error: ${lastErr.message}`);
 }
 
 function padAddress(addr) {
@@ -139,6 +160,7 @@ async function fetchCourtyardCards() {
   const wallet = padAddress(NFT_WALLET);
 
   // 1. balanceOf(address) — 0x70a08231
+  console.log('[courtyard] Step 1: Calling balanceOf...');
   const balanceHex = await polygonCall({
     to: COURTYARD_CONTRACT,
     data: '0x70a08231' + wallet,
@@ -149,8 +171,10 @@ async function fetchCourtyardCards() {
   if (balance === 0) return [];
 
   // 2. tokenOfOwnerByIndex(address, index) — 0x2f745c59
+  console.log(`[courtyard] Step 2: Fetching ${balance} token IDs...`);
   const tokenIds = [];
   for (let i = 0; i < balance; i++) {
+    console.log(`[courtyard] tokenOfOwnerByIndex(${i}/${balance})...`);
     const result = await polygonCall({
       to: COURTYARD_CONTRACT,
       data: '0x2f745c59' + wallet + padUint256(i),
@@ -160,9 +184,11 @@ async function fetchCourtyardCards() {
   console.log(`[courtyard] Token IDs:`, tokenIds);
 
   // 3. tokenURI(uint256) — 0xc87b56dd for each token
+  console.log(`[courtyard] Step 3: Fetching metadata for ${tokenIds.length} tokens...`);
   const cards = [];
   for (const tokenId of tokenIds) {
     try {
+      console.log(`[courtyard] tokenURI(${tokenId})...`);
       const uriHex = await polygonCall({
         to: COURTYARD_CONTRACT,
         data: '0xc87b56dd' + padUint256(Number(tokenId)),
@@ -174,9 +200,13 @@ async function fetchCourtyardCards() {
       const length = parseInt(stripped.slice(offset, offset + 64), 16);
       const hexStr = stripped.slice(offset + 64, offset + 64 + length * 2);
       const uri = Buffer.from(hexStr, 'hex').toString('utf8');
+      console.log(`[courtyard] Fetching metadata from: ${uri}`);
 
-      // Fetch metadata JSON
-      const metaRes = await fetch(uri);
+      // Fetch metadata JSON with timeout
+      const metaController = new AbortController();
+      const metaTimer = setTimeout(() => metaController.abort(), RPC_TIMEOUT);
+      const metaRes = await fetch(uri, { signal: metaController.signal });
+      clearTimeout(metaTimer);
       const meta = await metaRes.json();
 
       cards.push({
@@ -186,8 +216,9 @@ async function fetchCourtyardCards() {
         grade: meta.attributes?.find(a => /grade|psa/i.test(a.trait_type))?.value || null,
         attributes: meta.attributes || [],
       });
+      console.log(`[courtyard] Got card: ${meta.name || tokenId}`);
     } catch (err) {
-      console.error(`[courtyard] Error fetching token ${tokenId}:`, err.message);
+      console.error(`[courtyard] Error fetching token ${tokenId}:`, err.message, err.stack);
       cards.push({ tokenId, name: `Token #${tokenId}`, image: null, grade: null, attributes: [] });
     }
   }
@@ -201,12 +232,22 @@ app.get('/price', (req, res) => {
 });
 
 app.get('/courtyard-cards', async (req, res) => {
+  const RESPONSE_TIMEOUT = 25000;
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    console.error('[courtyard] Response timeout after 25s');
+    res.status(504).json({ error: 'timeout', cards: [] });
+  }, RESPONSE_TIMEOUT);
+
   try {
     const cards = await fetchCourtyardCards();
-    res.json({ count: cards.length, cards });
+    clearTimeout(timer);
+    if (!timedOut) res.json({ count: cards.length, cards });
   } catch (err) {
+    clearTimeout(timer);
     console.error('[courtyard] Endpoint error:', err.message, err.stack);
-    res.status(500).json({ error: err.message });
+    if (!timedOut) res.status(500).json({ error: err.message });
   }
 });
 
