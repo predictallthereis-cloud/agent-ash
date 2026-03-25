@@ -679,23 +679,13 @@
       <span class="sec-tag" style="cursor:pointer;text-decoration:underline;" onclick="switchTab('collection')">View All →</span>
     </div>
 
-    <div class="card-grid">
-      <div class="p-card" onclick="openDetail(0)">
-        <div class="p-card-media-wrap">
-          <img class="p-card-media" src="card_showcase.png" alt="Pikachu Full Art PSA 10" />
-        </div>
-        <div class="p-card-body">
-          <div class="p-card-grade">PSA 10 · GEM MINT</div>
-          <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
-          <div class="p-card-value card-price-val">$1,200.00</div>
-        </div>
-      </div>
+    <div class="card-grid" id="overview-card-grid">
     </div>
 
     <div class="coll-bar">
       <div>
         <div class="cb-label">Collection Total</div>
-        <div class="cb-sub">1 card · PSA graded · <span id="card-live" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)">● —</span></div>
+        <div class="cb-sub" id="overview-coll-sub">— cards · <span id="card-live" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)">● —</span></div>
       </div>
       <div class="cb-val collection-total-val">$1,200.00</div>
     </div>
@@ -726,23 +716,13 @@
       <span class="sec-tag" id="collection-count-tag">1 Card · PSA Graded</span>
     </div>
 
-    <div class="card-grid">
-      <div class="p-card" onclick="openDetail(0)">
-        <div class="p-card-media-wrap">
-          <img class="p-card-media" src="card_showcase.png" alt="Pikachu Full Art PSA 10" />
-        </div>
-        <div class="p-card-body">
-          <div class="p-card-grade">PSA 10 · GEM MINT</div>
-          <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
-          <div class="p-card-value card-price-val">$1,200.00</div>
-        </div>
-      </div>
+    <div class="card-grid" id="collection-card-grid">
     </div>
 
     <div class="coll-bar">
       <div>
         <div class="cb-label">Collection Total</div>
-        <div class="cb-sub">1 card · PSA graded · <span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)" id="card-last-updated">Last updated: —</span></div>
+        <div class="cb-sub" id="collection-coll-sub">— cards · <span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)" id="card-last-updated">Last updated: —</span></div>
       </div>
       <div class="cb-val collection-total-val">$1,200.00</div>
     </div>
@@ -811,40 +791,67 @@
   <div class="detail-media" id="detailMedia"></div>
   <div class="media-tabs-bar" id="mediaTabs"></div>
   <div class="detail-info">
-    <div class="detail-eyebrow">// Card Portfolio · PSA Graded</div>
+    <div class="detail-eyebrow" id="d-eyebrow">// Card Portfolio · PSA Graded</div>
     <div class="detail-title" id="d-title"></div>
-    <div class="detail-price card-price-val" id="d-price">$1,200.00</div>
+    <div class="detail-price" id="d-price">$1,200.00</div>
     <div id="d-price-updated" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);margin-top:2px"></div>
     <div class="detail-divider"></div>
     <div id="d-rows"></div>
-    <a id="d-psa-link" href="#" target="_blank" class="cert-link">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
-      View PSA Certificate
-    </a>
-    <a id="d-courtyard-link" href="#" target="_blank" class="courtyard-link">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
-      View on Courtyard.io
-    </a>
+    <div id="d-links"></div>
   </div>
 </div>
 
 <script>
-  const CARDS = [{
-    title: '2019 Pokémon Sun & Moon Dream League #054 Pikachu — Full Art (PSA 10 GEM MINT)',
-    grader: 'PSA', grade: '10', grade_label: 'GEM MINT',
-    cert: '99895725',
-    psa_link: 'https://www.psacard.com/cert/99895725',
-    courtyard_link: 'https://courtyard.io/asset/8c99487dc8046491286671308b38df7a8e7da26a64cf5f4ae2f6d6c71ec71a52',
-    set: 'Sun & Moon — Dream League', year: '2019',
-    number: '#054/049 CHR', language: 'Japanese',
-    price: '$1,200.00',
-    media: [
-      { type:'video', src:'nft_animation.mp4' },
-      { type:'img', src:'card_showcase.png' },
-      { type:'img', src:'card_front.png' },
-      { type:'img', src:'card_back.png' },
-    ]
-  }];
+  // Pikachu-specific local media (for the Dream League #054 PSA 10)
+  const PIKACHU_MEDIA = [
+    { type:'video', src:'nft_animation.mp4' },
+    { type:'img', src:'card_showcase.png' },
+    { type:'img', src:'card_front.png' },
+    { type:'img', src:'card_back.png' },
+  ];
+
+  // ─── PARSE CARD ATTRIBUTES ───
+  function parseCardAttributes(card) {
+    const attrs = card.attributes || [];
+    const get = (key) => attrs.find(a => (a.trait_type || '').toLowerCase() === key.toLowerCase())?.value || null;
+    const variants = attrs.filter(a => !a.trait_type && a.value).map(a => a.value);
+
+    const grader = get('Grader');
+    const serial = get('Serial');
+    const rawGrade = get('Grade');
+    const grade = rawGrade ? rawGrade.replace(/^(\d+(?:\.\d+)?)\s+/, '$1 — ') : null;
+
+    const rawSet = get('Set') || '';
+    const cleanSet = rawSet.replace(/^Pokémon\s+/i, '');
+
+    return {
+      grader,
+      grade,
+      gradeShort: rawGrade,
+      certNum: serial ? `${grader || 'Cert'}: ${serial}` : null,
+      serial,
+      certUrl: grader === 'PSA' && serial ? `https://www.psacard.com/cert/${serial}`
+             : grader === 'CGC' && serial ? `https://www.cgccards.com/certlookup/${serial}` : null,
+      certLabel: grader === 'PSA' ? 'View PSA Certificate'
+              : grader === 'CGC' ? 'View CGC Certificate'
+              : grader === 'BGS' ? 'View BGS Certificate' : null,
+      set: cleanSet,
+      year: get('Year'),
+      number: get('Card Number') ? `#${get('Card Number')}` : null,
+      language: get('Language'),
+      subject: get('Title/Subject'),
+      category: get('Category'),
+      variants,
+      isSealed: !grader,
+      courtyardUrl: `https://courtyard.io/asset/polygon/${card.contractAddress}/${card.tokenId}`,
+    };
+  }
+
+  function isPikachuDreamLeague(card) {
+    const n = (card.name || '').toLowerCase();
+    const g = (card.grade || '').toLowerCase();
+    return n.includes('pikachu') && n.includes('dream league') && g.includes('10') && g.includes('gem mint');
+  }
 
   // ─── TABS ───
   function closeMenu() {
@@ -868,26 +875,52 @@
   }
 
   // ─── DETAIL PANEL ───
-  function openDetail(idx) {
-    const card = CARDS[idx];
-    document.getElementById('d-price').style.color = '';
-    document.getElementById('d-psa-link').style.display = '';
-    document.getElementById('d-courtyard-link').style.display = '';
-    document.getElementById('d-title').textContent = card.title;
-    const livePrice = document.querySelector('.card-price-val')?.textContent || card.price;
-    document.getElementById('d-price').textContent = livePrice;
-    document.getElementById('d-psa-link').href = card.psa_link;
-    document.getElementById('d-courtyard-link').href = card.courtyard_link;
+  function openCardDetail(idx) {
+    const card = _courtyardCards[idx];
+    if (!card) return;
+    const parsed = parseCardAttributes(card);
+    const shortName = card.name.replace(/^Courtyard\s*/i, '');
+    const isPikachu = isPikachuDreamLeague(card);
 
-    const rows = [
-      { label:'Grader',   val:card.grader },
-      { label:'Grade',    val:card.grade + ' — ' + card.grade_label, highlight:true },
-      { label:'Cert #',   val:'PSA: ' + card.cert },
-      { label:'Set',      val:card.set },
-      { label:'Year',     val:card.year },
-      { label:'Number',   val:card.number },
-      { label:'Language', val:card.language },
-    ];
+    // Eyebrow
+    const eyebrow = document.getElementById('d-eyebrow');
+    eyebrow.textContent = parsed.isSealed
+      ? '// Card Portfolio · Sealed Product'
+      : `// Card Portfolio · ${parsed.grader || 'Graded'}`;
+
+    // Title
+    document.getElementById('d-title').textContent = shortName;
+
+    // Price — only Pikachu has live price
+    const priceEl = document.getElementById('d-price');
+    if (isPikachu) {
+      const livePrice = document.querySelector('.card-price-val')?.textContent || '—';
+      priceEl.textContent = livePrice;
+      priceEl.style.color = '';
+      priceEl.className = 'detail-price card-price-val';
+    } else {
+      priceEl.textContent = '—';
+      priceEl.style.color = 'var(--muted)';
+      priceEl.className = 'detail-price';
+    }
+    const dUpd = document.getElementById('d-price-updated');
+    if (dUpd) dUpd.textContent = isPikachu ? (document.getElementById('card-last-updated')?.textContent || '') : '';
+
+    // Rows
+    const rows = [];
+    if (!parsed.isSealed) {
+      rows.push({ label:'Grader', val: parsed.grader });
+      if (parsed.grade) rows.push({ label:'Grade', val: parsed.grade, highlight: true });
+      if (parsed.certNum) rows.push({ label:'Cert #', val: parsed.certNum });
+    } else {
+      rows.push({ label:'Condition', val: 'Sealed', highlight: true });
+    }
+    if (parsed.set) rows.push({ label:'Set', val: parsed.set });
+    if (parsed.year) rows.push({ label:'Year', val: parsed.year });
+    if (parsed.number) rows.push({ label:'Number', val: parsed.number });
+    if (parsed.language) rows.push({ label:'Language', val: parsed.language });
+    if (parsed.variants.length) rows.push({ label:'Variant', val: parsed.variants.join(', ') });
+
     document.getElementById('d-rows').innerHTML = rows.map(r => `
       <div class="detail-row">
         <span class="detail-row-label">${r.label}</span>
@@ -896,19 +929,35 @@
           : `<span class="detail-row-val">${r.val}</span>`}
       </div>`).join('');
 
-    const container = document.getElementById('detailMedia');
-    container.innerHTML = card.media.map((m,i) => {
-      if (m.type==='video') return `<video class="p-card-media ${i===0?'active':''}" ${i===0?'autoplay':''} loop muted playsinline><source src="${m.src}" type="video/mp4"/></video>`;
-      return `<img class="p-card-media ${i===0?'active':''}" src="${m.src}" alt="" />`;
-    }).join('');
+    // Links
+    const linkIcon = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>';
+    let linksHtml = '';
+    if (parsed.certUrl) {
+      linksHtml += `<a href="${parsed.certUrl}" target="_blank" class="cert-link">${linkIcon} ${parsed.certLabel}</a>`;
+    }
+    linksHtml += `<a href="${parsed.courtyardUrl}" target="_blank" class="courtyard-link">${linkIcon} View on Courtyard.io</a>`;
+    document.getElementById('d-links').innerHTML = linksHtml;
 
-    document.getElementById('mediaTabs').innerHTML = card.media.map((_,i) =>
-      `<button class="media-tab ${i===0?'active':''}" onclick="switchMedia(${i})"></button>`).join('');
+    // Media
+    const container = document.getElementById('detailMedia');
+    if (isPikachu) {
+      container.innerHTML = PIKACHU_MEDIA.map((m,i) => {
+        if (m.type==='video') return `<video class="p-card-media ${i===0?'active':''}" ${i===0?'autoplay':''} loop muted playsinline><source src="${m.src}" type="video/mp4"/></video>`;
+        return `<img class="p-card-media ${i===0?'active':''}" src="${m.src}" alt="" />`;
+      }).join('');
+      document.getElementById('mediaTabs').innerHTML = PIKACHU_MEDIA.map((_,i) =>
+        `<button class="media-tab ${i===0?'active':''}" onclick="switchMedia(${i})"></button>`).join('');
+    } else if (card.image) {
+      container.innerHTML = `<img class="p-card-media active" src="${card.image}" alt="${shortName}" />`;
+      document.getElementById('mediaTabs').innerHTML = '';
+    } else {
+      container.innerHTML = `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:var(--muted)">No Image Available</div>`;
+      document.getElementById('mediaTabs').innerHTML = '';
+    }
 
     document.getElementById('detailOverlay').classList.add('open');
     requestAnimationFrame(() => {
       document.getElementById('detailPanel').classList.add('open');
-      // Autoplay the first video if present
       const vid = container.querySelector('video.active');
       if (vid) vid.play().catch(() => {});
     });
@@ -931,10 +980,10 @@
   }
 
   function copyWallet() {
-    navigator.clipboard.writeText('0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b').then(() => {
+    navigator.clipboard.writeText(CONFIG.WALLET_ADDRESS).then(() => {
       const el = document.getElementById('walletLabel');
       el.textContent = 'Copied ✓';
-      setTimeout(() => { el.textContent = '0x1a2b...3c4d'; }, 1500);
+      setTimeout(() => { el.textContent = CONFIG.WALLET_ADDRESS.slice(0,6) + '...' + CONFIG.WALLET_ADDRESS.slice(-4); }, 1500);
     });
   }
 
@@ -1180,110 +1229,88 @@
       console.log('[Courtyard] Got', _courtyardCards.length, 'cards');
 
       // Update card counts
-      const totalCards = 1 + _courtyardCards.length; // Pikachu + courtyard
+      const totalCards = _courtyardCards.length;
+      const graded = _courtyardCards.filter(c => { const p = parseCardAttributes(c); return !p.isSealed; }).length;
+      const sealed = totalCards - graded;
+
       const countEl = document.getElementById('metric-cards-count');
       if (countEl) countEl.textContent = totalCards;
       const cstatEl = document.getElementById('cstat-total-cards');
       if (cstatEl) cstatEl.textContent = totalCards;
       const tagEl = document.getElementById('collection-count-tag');
-      if (tagEl) tagEl.textContent = totalCards + ' Cards · PSA Graded';
+      if (tagEl) tagEl.textContent = `${totalCards} Cards · ${graded} Graded` + (sealed > 0 ? ` · ${sealed} Sealed` : '');
+      const overviewSub = document.getElementById('overview-coll-sub');
+      if (overviewSub) {
+        const liveSpan = document.getElementById('card-live');
+        const liveHtml = liveSpan ? liveSpan.outerHTML : '';
+        overviewSub.innerHTML = `${totalCards} cards · ${graded} graded · ${liveHtml}`;
+      }
+      const collSub = document.getElementById('collection-coll-sub');
+      if (collSub) {
+        const updSpan = document.getElementById('card-last-updated');
+        const updHtml = updSpan ? updSpan.outerHTML : '';
+        collSub.innerHTML = `${totalCards} cards · ${graded} graded · ${updHtml}`;
+      }
 
-      // Render courtyard cards in collection grid
-      renderCourtyardCards();
+      // Render all cards
+      renderAllCards();
     } catch(e) {
       console.warn('[Courtyard] Fetch failed:', e);
     }
   }
 
-  function renderCourtyardCards() {
-    // Add to overview card grid
-    const overviewGrid = document.querySelector('#content-overview .card-grid');
-    // Add to collection card grid
-    const collectionGrid = document.querySelector('#content-collection .card-grid');
+  function buildCardHtml(card, idx) {
+    const parsed = parseCardAttributes(card);
+    const shortName = card.name.replace(/^Courtyard\s*/i, '');
+    const imgSrc = card.image || '';
+    const isPikachu = isPikachuDreamLeague(card);
 
-    const cardsHtml = _courtyardCards.map((card, i) => {
-      const idx = i + 1; // offset by 1 since Pikachu is index 0
-      const gradeText = card.grade || '—';
-      const imgSrc = card.image || '';
-      const shortName = card.name.replace(/^Courtyard\s*/i, '');
-      return `<div class="p-card" onclick="openCourtyardDetail(${i})">
-        <div class="p-card-media-wrap">
-          ${imgSrc ? `<img class="p-card-media" src="${imgSrc}" alt="${shortName}" />` : `<div class="p-card-media" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">No Image</div>`}
-        </div>
-        <div class="p-card-body">
-          ${gradeText !== '—' ? `<div class="p-card-grade">${gradeText}</div>` : ''}
-          <div class="p-card-name">${shortName}</div>
-          <div class="p-card-value" style="color:var(--muted)">—</div>
-        </div>
-      </div>`;
-    }).join('');
+    // For Pikachu, use local image
+    const mediaSrc = isPikachu ? 'card_showcase.png' : imgSrc;
 
-    if (collectionGrid) {
-      // Remove old courtyard cards
-      collectionGrid.querySelectorAll('.courtyard-card').forEach(el => el.remove());
-      collectionGrid.insertAdjacentHTML('beforeend', cardsHtml.replace(/class="p-card"/g, 'class="p-card courtyard-card"'));
+    let gradeHtml = '';
+    if (parsed.isSealed) {
+      gradeHtml = '<div class="p-card-grade" style="background:rgba(42,112,184,.12);border-color:rgba(42,112,184,.4);color:var(--blue)">SEALED</div>';
+    } else if (parsed.gradeShort) {
+      const graderLabel = parsed.grader || '';
+      const gradeNum = parsed.gradeShort.match(/^(\d+(?:\.\d+)?)/)?.[1] || '';
+      const gradeSuffix = parsed.gradeShort.replace(/^\d+(?:\.\d+)?\s*/, '');
+      gradeHtml = `<div class="p-card-grade">${graderLabel} ${gradeNum}${gradeSuffix ? ' · ' + gradeSuffix : ''}</div>`;
     }
 
-    // Show first 3 in overview
-    if (overviewGrid && _courtyardCards.length > 0) {
-      overviewGrid.querySelectorAll('.courtyard-card').forEach(el => el.remove());
-      const previewHtml = _courtyardCards.slice(0, 3).map((card, i) => {
-        const gradeText = card.grade || '—';
-        const imgSrc = card.image || '';
-        const shortName = card.name.replace(/^Courtyard\s*/i, '');
-        return `<div class="p-card courtyard-card" onclick="openCourtyardDetail(${i})">
-          <div class="p-card-media-wrap">
-            ${imgSrc ? `<img class="p-card-media" src="${imgSrc}" alt="${shortName}" />` : `<div class="p-card-media" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">No Image</div>`}
-          </div>
-          <div class="p-card-body">
-            ${gradeText !== '—' ? `<div class="p-card-grade">${gradeText}</div>` : ''}
-            <div class="p-card-name">${shortName}</div>
-            <div class="p-card-value" style="color:var(--muted)">—</div>
-          </div>
-        </div>`;
-      }).join('');
-      overviewGrid.insertAdjacentHTML('beforeend', previewHtml);
+    let priceHtml;
+    if (isPikachu) {
+      const livePrice = document.querySelector('.card-price-val')?.textContent || '—';
+      priceHtml = `<div class="p-card-value card-price-val">${livePrice}</div>`;
+    } else {
+      priceHtml = '<div class="p-card-value" style="color:var(--muted)">—</div>';
     }
+
+    return `<div class="p-card" onclick="openCardDetail(${idx})">
+      <div class="p-card-media-wrap">
+        ${mediaSrc ? `<img class="p-card-media" src="${mediaSrc}" alt="${shortName}" />` : `<div class="p-card-media" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">No Image</div>`}
+      </div>
+      <div class="p-card-body">
+        ${gradeHtml}
+        <div class="p-card-name">${shortName}</div>
+        ${priceHtml}
+      </div>
+    </div>`;
   }
 
-  function openCourtyardDetail(idx) {
-    const card = _courtyardCards[idx];
-    if (!card) return;
-    const shortName = card.name.replace(/^Courtyard\s*/i, '');
-    document.getElementById('d-title').textContent = shortName;
-    document.getElementById('d-price').textContent = '—';
-    document.getElementById('d-price').style.color = 'var(--muted)';
-    const dUpd = document.getElementById('d-price-updated');
-    if (dUpd) dUpd.textContent = '';
-    document.getElementById('d-psa-link').style.display = 'none';
-    document.getElementById('d-courtyard-link').style.display = 'none';
+  function renderAllCards() {
+    const overviewGrid = document.getElementById('overview-card-grid');
+    const collectionGrid = document.getElementById('collection-card-grid');
 
-    const rows = [
-      { label:'Grade', val: card.grade || '—', highlight: !!card.grade },
-      { label:'Token ID', val: card.tokenId },
-      { label:'Contract', val: card.contractAddress ? card.contractAddress.slice(0,6) + '...' + card.contractAddress.slice(-4) : '—' },
-    ];
-    if (card.attributes && card.attributes.length) {
-      card.attributes.forEach(a => {
-        rows.push({ label: a.trait_type || a.key || 'Attribute', val: a.value || '—' });
-      });
+    // Collection: all cards
+    if (collectionGrid) {
+      collectionGrid.innerHTML = _courtyardCards.map((card, i) => buildCardHtml(card, i)).join('');
     }
-    document.getElementById('d-rows').innerHTML = rows.map(r => `
-      <div class="detail-row">
-        <span class="detail-row-label">${r.label}</span>
-        ${r.highlight ? `<span class="grade-badge">${r.val}</span>` : `<span class="detail-row-val">${r.val}</span>`}
-      </div>`).join('');
 
-    const container = document.getElementById('detailMedia');
-    if (card.image) {
-      container.innerHTML = `<img class="p-card-media active" src="${card.image}" alt="${shortName}" />`;
-    } else {
-      container.innerHTML = `<div style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:var(--muted)">No Image Available</div>`;
+    // Overview: first 4 cards
+    if (overviewGrid) {
+      overviewGrid.innerHTML = _courtyardCards.slice(0, 4).map((card, i) => buildCardHtml(card, i)).join('');
     }
-    document.getElementById('mediaTabs').innerHTML = '';
-
-    document.getElementById('detailOverlay').classList.add('open');
-    requestAnimationFrame(() => document.getElementById('detailPanel').classList.add('open'));
   }
 
   // ── ACTIVITY — Basescan txlist + Blockscout token-transfers ──
