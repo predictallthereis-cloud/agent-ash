@@ -114,13 +114,11 @@ async function scrapePrice() {
 // ── COURTYARD NFT HELPERS ──
 const COURTYARD_CONTRACT = '0x581425c638882bd8169dae6f2995878927c9fe70';
 const NFT_WALLET = '0x028Edd38341280e3e322D75C09b90E420572d21f';
-const FETCH_TIMEOUT = 8000; // 8 seconds
+const FETCH_TIMEOUT = 10000;
+const TWELVE_HOURS = 12 * 60 * 60 * 1000;
 
-const POLYGONSCAN_URL = 'https://api.polygonscan.com/api'
-  + '?module=account&action=tokennfttx'
-  + `&contractaddress=${COURTYARD_CONTRACT}`
-  + `&address=${NFT_WALLET}`
-  + '&page=1&offset=100&sort=desc';
+// In-memory cards cache
+let cachedCards = { count: 0, cards: [], source: 'none', updated: null };
 
 function fetchWithTimeout(url, opts = {}, timeout = FETCH_TIMEOUT) {
   const controller = new AbortController();
@@ -129,90 +127,87 @@ function fetchWithTimeout(url, opts = {}, timeout = FETCH_TIMEOUT) {
     .finally(() => clearTimeout(timer));
 }
 
+function parseOpenSeaNFTs(data) {
+  if (!data.nfts || !Array.isArray(data.nfts)) return [];
+  return data.nfts.map(nft => ({
+    tokenId: nft.identifier || nft.token_id,
+    name: nft.name || nft.title || `Token #${nft.identifier || nft.token_id}`,
+    image: nft.image_url || nft.display_image_url || nft.metadata?.image || null,
+    grade: nft.traits?.find(t => /grade|psa/i.test(t.trait_type || ''))?.value
+      || nft.metadata?.attributes?.find(a => /grade|psa/i.test(a.trait_type || ''))?.value
+      || null,
+    attributes: nft.traits || nft.metadata?.attributes || [],
+  }));
+}
+
+function parseAlchemyNFTs(data) {
+  if (!data.ownedNfts || !Array.isArray(data.ownedNfts)) return [];
+  return data.ownedNfts.map(nft => ({
+    tokenId: nft.tokenId,
+    name: nft.name || nft.title || nft.raw?.metadata?.name || `Token #${nft.tokenId}`,
+    image: nft.image?.cachedUrl || nft.image?.originalUrl || nft.raw?.metadata?.image || null,
+    grade: nft.raw?.metadata?.attributes?.find(a => /grade|psa/i.test(a.trait_type || ''))?.value || null,
+    attributes: nft.raw?.metadata?.attributes || [],
+  }));
+}
+
 async function fetchCourtyardCards() {
-  // 1. Get NFT transfer history from PolygonScan
-  console.log('[courtyard] Step 1: Fetching NFT transfers from PolygonScan...');
-  const txRes = await fetchWithTimeout(POLYGONSCAN_URL);
-  const txData = await txRes.json();
-
-  if (txData.status !== '1' || !Array.isArray(txData.result)) {
-    console.error('[courtyard] PolygonScan error:', txData.message || txData.result);
-    throw new Error(`PolygonScan: ${txData.message || 'no results'}`);
-  }
-
-  console.log(`[courtyard] Got ${txData.result.length} NFT transfers`);
-
-  // 2. Determine which tokenIDs are currently held (received - sent)
-  const wallet = NFT_WALLET.toLowerCase();
-  const held = new Map(); // tokenID -> last transfer info
-
-  // Process oldest-first to track current state
-  const transfers = txData.result.reverse();
-  for (const tx of transfers) {
-    const tokenId = tx.tokenID;
-    if (tx.to.toLowerCase() === wallet) {
-      // Received
-      held.set(tokenId, {
-        tokenId,
-        tokenName: tx.tokenName,
-        contractAddress: tx.contractAddress,
-        hash: tx.hash,
-      });
-    } else if (tx.from.toLowerCase() === wallet) {
-      // Sent away
-      held.delete(tokenId);
+  // Strategy 1: OpenSea API (no key required)
+  try {
+    const openSeaUrl = `https://api.opensea.io/api/v2/chain/matic/account/${NFT_WALLET}/nfts?collection=courtyard-io&limit=50`;
+    console.log('[courtyard] Trying OpenSea API...');
+    const res = await fetchWithTimeout(openSeaUrl, {
+      headers: { 'accept': 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const cards = parseOpenSeaNFTs(data);
+      console.log(`[courtyard] OpenSea returned ${cards.length} NFTs`);
+      if (cards.length > 0) return { source: 'opensea', cards };
+    } else {
+      console.log(`[courtyard] OpenSea returned ${res.status}: ${await res.text().catch(() => '')}`);
     }
+  } catch (err) {
+    console.error('[courtyard] OpenSea failed:', err.message);
   }
 
-  const ownedTokens = [...held.values()];
-  console.log(`[courtyard] Currently holds ${ownedTokens.length} NFTs:`, ownedTokens.map(t => t.tokenId));
-
-  if (ownedTokens.length === 0) return [];
-
-  // 3. Try to fetch metadata for each token
-  console.log(`[courtyard] Step 2: Fetching metadata for ${ownedTokens.length} tokens...`);
-  const cards = [];
-
-  for (const token of ownedTokens) {
-    try {
-      // Try Courtyard API first
-      const metaUrl = `https://api.courtyard.io/v1/assets/${token.tokenId}`;
-      console.log(`[courtyard] Fetching metadata: ${metaUrl}`);
-      const metaRes = await fetchWithTimeout(metaUrl, {}, 5000);
-
-      if (metaRes.ok) {
-        const meta = await metaRes.json();
-        cards.push({
-          tokenId: token.tokenId,
-          name: meta.name || meta.title || token.tokenName || `Token #${token.tokenId}`,
-          image: meta.image || meta.image_url || null,
-          grade: meta.grade || meta.psa_grade || meta.attributes?.find(a => /grade|psa/i.test(a.trait_type || a.key || ''))?.value || null,
-          attributes: meta.attributes || [],
-        });
-        console.log(`[courtyard] Got card: ${cards[cards.length - 1].name}`);
-      } else {
-        console.log(`[courtyard] Courtyard API returned ${metaRes.status} for token ${token.tokenId}, using transfer data`);
-        cards.push({
-          tokenId: token.tokenId,
-          name: token.tokenName || `Token #${token.tokenId}`,
-          image: null,
-          grade: null,
-          attributes: [],
-        });
-      }
-    } catch (err) {
-      console.error(`[courtyard] Metadata error for token ${token.tokenId}:`, err.message);
-      cards.push({
-        tokenId: token.tokenId,
-        name: token.tokenName || `Token #${token.tokenId}`,
-        image: null,
-        grade: null,
-        attributes: [],
-      });
+  // Strategy 2: Alchemy free NFT API
+  try {
+    const alchemyUrl = `https://polygon-mainnet.g.alchemy.com/nft/v3/demo/getNFTsForOwner`
+      + `?owner=${NFT_WALLET}`
+      + `&contractAddresses[]=${COURTYARD_CONTRACT}`
+      + `&withMetadata=true`;
+    console.log('[courtyard] Trying Alchemy API...');
+    const res = await fetchWithTimeout(alchemyUrl);
+    if (res.ok) {
+      const data = await res.json();
+      const cards = parseAlchemyNFTs(data);
+      console.log(`[courtyard] Alchemy returned ${cards.length} NFTs`);
+      if (cards.length > 0) return { source: 'alchemy', cards };
+    } else {
+      console.log(`[courtyard] Alchemy returned ${res.status}: ${await res.text().catch(() => '')}`);
     }
+  } catch (err) {
+    console.error('[courtyard] Alchemy failed:', err.message);
   }
 
-  return cards;
+  throw new Error('All NFT API sources failed (OpenSea, Alchemy)');
+}
+
+async function refreshCards() {
+  console.log('[courtyard] Refreshing cards cache...');
+  try {
+    const result = await fetchCourtyardCards();
+    cachedCards = {
+      count: result.cards.length,
+      cards: result.cards,
+      source: result.source,
+      updated: new Date().toISOString(),
+    };
+    console.log(`[courtyard] Cache updated: ${cachedCards.count} cards from ${cachedCards.source}`);
+  } catch (err) {
+    console.error('[courtyard] Refresh failed:', err.message, err.stack);
+  }
 }
 
 // ── ROUTES ──
@@ -220,24 +215,8 @@ app.get('/price', (req, res) => {
   res.json(cachedPrice);
 });
 
-app.get('/courtyard-cards', async (req, res) => {
-  const RESPONSE_TIMEOUT = 25000;
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    console.error('[courtyard] Response timeout after 25s');
-    res.status(504).json({ error: 'timeout', cards: [] });
-  }, RESPONSE_TIMEOUT);
-
-  try {
-    const cards = await fetchCourtyardCards();
-    clearTimeout(timer);
-    if (!timedOut) res.json({ count: cards.length, cards });
-  } catch (err) {
-    clearTimeout(timer);
-    console.error('[courtyard] Endpoint error:', err.message, err.stack);
-    if (!timedOut) res.status(500).json({ error: err.message });
-  }
+app.get('/courtyard-cards', (req, res) => {
+  res.json(cachedCards);
 });
 
 app.get('/health', (req, res) => {
@@ -248,9 +227,11 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`[server] Listening on port ${PORT}`);
 
-  // Scrape on startup
+  // Scrape price on startup + every 6 hours
   scrapePrice();
-
-  // Re-scrape every 6 hours
   setInterval(scrapePrice, SIX_HOURS);
+
+  // Fetch NFT cards on startup + every 12 hours
+  refreshCards();
+  setInterval(refreshCards, TWELVE_HOURS);
 });
