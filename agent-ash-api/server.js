@@ -457,17 +457,31 @@ async function refreshActivity() {
     const nftTxs = (nftData.status === '1' && Array.isArray(nftData.result)) ? nftData.result : [];
     const erc20Txs = (erc20Data.status === '1' && Array.isArray(erc20Data.result)) ? erc20Data.result : [];
 
-    // Build card name lookup from cached cards + transfer tokenName fallback
+    console.log(`[activity] NFT transfers: ${nftTxs.length}, ERC-20 transfers: ${erc20Txs.length}`);
+    if (erc20Txs.length === 0) {
+      console.log('[activity] ERC-20 API response:', JSON.stringify(erc20Data).slice(0, 300));
+    }
+
+    // Build card name lookup from cached cards
     const cardNames = {};
     for (const card of (cachedCards.cards || [])) {
       cardNames[card.tokenId] = card.name;
     }
 
-    // USDC contract addresses (both native and bridged)
+    // USDC contract addresses (both native and bridged) — lowercase
     const USDC_ADDRS = new Set([
       '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
       '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
     ]);
+
+    // Log unique token symbols in ERC-20 transfers for debugging
+    const symbolSet = new Set(erc20Txs.map(t => `${t.tokenSymbol}@${t.contractAddress.toLowerCase()}`));
+    const usdcMatches = erc20Txs.filter(t => USDC_ADDRS.has(t.contractAddress.toLowerCase()));
+    console.log(`[activity] ERC-20 token symbols: ${[...symbolSet].join(', ')}`);
+    console.log(`[activity] USDC contract matches: ${usdcMatches.length}`);
+    if (usdcMatches.length > 0) {
+      console.log(`[activity] First USDC match: symbol=${usdcMatches[0].tokenSymbol} value=${usdcMatches[0].value} decimals=${usdcMatches[0].tokenDecimal}`);
+    }
 
     // Group ERC-20 transfers by tx hash
     const erc20ByHash = {};
@@ -497,10 +511,9 @@ async function refreshActivity() {
       const nfts = nftByHash[hash];
       const erc20s = erc20ByHash[hash] || [];
 
-      // Find USDC transfers in this tx (only actual USDC, filter spam)
+      // Find USDC transfers in this tx (match by contract address)
       const usdcTxs = erc20s.filter(t =>
-        USDC_ADDRS.has(t.contractAddress.toLowerCase()) &&
-        (t.tokenSymbol || '').toUpperCase().includes('USDC')
+        USDC_ADDRS.has(t.contractAddress.toLowerCase())
       );
       let usdcAmount = 0;
       let usdcDirection = null;
@@ -516,8 +529,10 @@ async function refreshActivity() {
         const nftToUs = nft.to.toLowerCase() === wallet;
         const nftFromZero = nft.from.toLowerCase() === '0x0000000000000000000000000000000000000000';
         const tokenId = nft.tokenID;
-        // Try cached card name first, then Etherscan tokenName, then truncated ID
-        const cardName = cardNames[tokenId] || nft.tokenName || `#${tokenId.slice(0, 8)}...`;
+        // Try cached card name first, then collection name + tokenId
+        const cached = cardNames[tokenId];
+        const collName = (nft.tokenName || '').replace(/^Courtyard\s*/i, '');
+        const cardName = cached || (collName ? `${collName} #${tokenId.slice(0, 6)}` : `#${tokenId.slice(0, 8)}...`);
 
         let type;
         if (nftToUs && usdcAmount > 0 && usdcDirection === 'out') {
@@ -555,7 +570,6 @@ async function refreshActivity() {
 
       for (const tx of erc20s) {
         if (!USDC_ADDRS.has(tx.contractAddress.toLowerCase())) continue;
-        if (!(tx.tokenSymbol || '').toUpperCase().includes('USDC')) continue;
         const amt = parseInt(tx.value || '0') / 1e6;
         if (amt < 0.01) continue;
 
