@@ -446,13 +446,25 @@ async function refreshActivity() {
   const wallet = NFT_WALLET.toLowerCase();
 
   try {
-    const [nftRes, erc20Res] = await Promise.all([
-      fetchWithTimeout(`${base}?chainid=137&module=account&action=tokennfttx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`),
-      fetchWithTimeout(`${base}?chainid=137&module=account&action=tokentx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`),
-    ]);
-
+    // Stagger API calls to avoid Etherscan rate limit (3/sec)
+    const nftRes = await fetchWithTimeout(`${base}?chainid=137&module=account&action=tokennfttx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`);
     const nftData = await nftRes.json();
-    const erc20Data = await erc20Res.json();
+
+    await new Promise(r => setTimeout(r, 1000)); // 1s gap between calls
+
+    const erc20Res = await fetchWithTimeout(`${base}?chainid=137&module=account&action=tokentx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`);
+    let erc20Data = await erc20Res.json();
+
+    // Retry ERC-20 fetch if rate limited
+    if (erc20Data.status !== '1') {
+      console.log(`[activity] ERC-20 first attempt failed: "${erc20Data.message || erc20Data.result}", retrying in 3s...`);
+      await new Promise(r => setTimeout(r, 3000));
+      const retryRes = await fetchWithTimeout(`${base}?chainid=137&module=account&action=tokentx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`);
+      erc20Data = await retryRes.json();
+      if (erc20Data.status !== '1') {
+        console.error(`[activity] ERC-20 retry also failed: "${erc20Data.message || erc20Data.result}"`);
+      }
+    }
 
     const nftTxs = (nftData.status === '1' && Array.isArray(nftData.result)) ? nftData.result : [];
     const erc20Txs = (erc20Data.status === '1' && Array.isArray(erc20Data.result)) ? erc20Data.result : [];
@@ -659,8 +671,10 @@ app.listen(PORT, () => {
   console.log(`[server] Listening on port ${PORT}`);
 
   // Fetch NFT cards first, then scrape prices + build activity
-  refreshCards().then(() => {
+  refreshCards().then(async () => {
     scrapeAllPrices();
+    // Wait 5s to avoid Etherscan rate limit before fetching ERC-20 transfers
+    await new Promise(r => setTimeout(r, 5000));
     refreshActivity();
   });
 
@@ -672,6 +686,7 @@ app.listen(PORT, () => {
   setInterval(async () => {
     await refreshCards();
     scrapeAllPrices();
+    await new Promise(r => setTimeout(r, 5000));
     refreshActivity();
   }, TWELVE_HOURS);
 });
