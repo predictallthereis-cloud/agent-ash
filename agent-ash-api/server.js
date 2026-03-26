@@ -215,6 +215,7 @@ async function fetchCourtyardCards() {
       grade,
       contractAddress: token.contractAddress,
       attributes: meta.attributes || [],
+      external_url: meta.external_url || null,
     };
   }
 

@@ -680,6 +680,16 @@
     </div>
 
     <div class="card-grid" id="overview-card-grid">
+      <div class="p-card" onclick="openPikachuDetail()">
+        <div class="p-card-media-wrap">
+          <img class="p-card-media" src="card_showcase.png" alt="Pikachu Full Art PSA 10" />
+        </div>
+        <div class="p-card-body">
+          <div class="p-card-grade">PSA 10 · GEM MINT</div>
+          <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
+          <div class="p-card-value card-price-val">$1,200.00</div>
+        </div>
+      </div>
     </div>
 
     <div class="coll-bar">
@@ -717,6 +727,16 @@
     </div>
 
     <div class="card-grid" id="collection-card-grid">
+      <div class="p-card" onclick="openPikachuDetail()">
+        <div class="p-card-media-wrap">
+          <img class="p-card-media" src="card_showcase.png" alt="Pikachu Full Art PSA 10" />
+        </div>
+        <div class="p-card-body">
+          <div class="p-card-grade">PSA 10 · GEM MINT</div>
+          <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
+          <div class="p-card-value card-price-val">$1,200.00</div>
+        </div>
+      </div>
     </div>
 
     <div class="coll-bar">
@@ -843,7 +863,7 @@
       category: get('Category'),
       variants,
       isSealed: !grader,
-      courtyardUrl: `https://courtyard.io/asset/polygon/${card.contractAddress}/${card.tokenId}`,
+      courtyardUrl: card.external_url || `https://courtyard.io/asset/polygon/${card.contractAddress}/${card.tokenId}`,
     };
   }
 
@@ -875,6 +895,55 @@
   }
 
   // ─── DETAIL PANEL ───
+  function openPikachuDetail() {
+    document.getElementById('d-eyebrow').textContent = '// Card Portfolio · PSA Graded';
+    document.getElementById('d-title').textContent = '2019 Pokémon Sun & Moon Dream League #054 Pikachu — Full Art (PSA 10 GEM MINT)';
+    const priceEl = document.getElementById('d-price');
+    const livePrice = document.querySelector('.card-price-val')?.textContent || '$378.00';
+    priceEl.textContent = livePrice;
+    priceEl.style.color = '';
+    priceEl.className = 'detail-price card-price-val';
+    const dUpd = document.getElementById('d-price-updated');
+    if (dUpd) dUpd.textContent = document.getElementById('card-last-updated')?.textContent || '';
+
+    const rows = [
+      { label:'Grader',   val:'PSA' },
+      { label:'Grade',    val:'10 — GEM MINT', highlight:true },
+      { label:'Cert #',   val:'PSA: 99895725' },
+      { label:'Set',      val:'Sun & Moon — Dream League' },
+      { label:'Year',     val:'2019' },
+      { label:'Number',   val:'#054/049 CHR' },
+      { label:'Language', val:'Japanese' },
+    ];
+    document.getElementById('d-rows').innerHTML = rows.map(r => `
+      <div class="detail-row">
+        <span class="detail-row-label">${r.label}</span>
+        ${r.highlight
+          ? `<span class="grade-badge">${r.val}</span>`
+          : `<span class="detail-row-val">${r.val}</span>`}
+      </div>`).join('');
+
+    const linkIcon = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>';
+    document.getElementById('d-links').innerHTML = `
+      <a href="https://www.psacard.com/cert/99895725" target="_blank" class="cert-link">${linkIcon} View PSA Certificate</a>
+      <a href="https://courtyard.io/asset/8c99487dc8046491286671308b38df7a8e7da26a64cf5f4ae2f6d6c71ec71a52" target="_blank" class="courtyard-link">${linkIcon} View on Courtyard.io</a>`;
+
+    const container = document.getElementById('detailMedia');
+    container.innerHTML = PIKACHU_MEDIA.map((m,i) => {
+      if (m.type==='video') return `<video class="p-card-media ${i===0?'active':''}" ${i===0?'autoplay':''} loop muted playsinline><source src="${m.src}" type="video/mp4"/></video>`;
+      return `<img class="p-card-media ${i===0?'active':''}" src="${m.src}" alt="" />`;
+    }).join('');
+    document.getElementById('mediaTabs').innerHTML = PIKACHU_MEDIA.map((_,i) =>
+      `<button class="media-tab ${i===0?'active':''}" onclick="switchMedia(${i})"></button>`).join('');
+
+    document.getElementById('detailOverlay').classList.add('open');
+    requestAnimationFrame(() => {
+      document.getElementById('detailPanel').classList.add('open');
+      const vid = container.querySelector('video.active');
+      if (vid) vid.play().catch(() => {});
+    });
+  }
+
   function openCardDetail(idx) {
     const card = _courtyardCards[idx];
     if (!card) return;
@@ -1225,11 +1294,13 @@
     try {
       const res = await fetch(COURTYARD_API);
       const data = await res.json();
-      _courtyardCards = data.cards || [];
-      console.log('[Courtyard] Got', _courtyardCards.length, 'cards');
+      // Filter out the Pikachu Dream League since it's the hardcoded template card
+      const allCards = data.cards || [];
+      _courtyardCards = allCards.filter(c => !isPikachuDreamLeague(c));
+      console.log('[Courtyard] Got', allCards.length, 'cards,', _courtyardCards.length, 'after dedup Pikachu');
 
-      // Update card counts
-      const totalCards = _courtyardCards.length;
+      // Update card counts (+1 for hardcoded Pikachu template)
+      const totalCards = 1 + _courtyardCards.length;
       const graded = _courtyardCards.filter(c => { const p = parseCardAttributes(c); return !p.isSealed; }).length;
       const sealed = totalCards - graded;
 
@@ -1302,14 +1373,24 @@
     const overviewGrid = document.getElementById('overview-card-grid');
     const collectionGrid = document.getElementById('collection-card-grid');
 
-    // Collection: all cards
+    // Remove previously injected API cards (keep the hardcoded Pikachu)
+    document.querySelectorAll('.api-card').forEach(el => el.remove());
+
+    const cardsHtml = _courtyardCards.map((card, i) =>
+      buildCardHtml(card, i).replace('class="p-card"', 'class="p-card api-card"')
+    ).join('');
+
+    // Collection: Pikachu is already there as #1, append the rest
     if (collectionGrid) {
-      collectionGrid.innerHTML = _courtyardCards.map((card, i) => buildCardHtml(card, i)).join('');
+      collectionGrid.insertAdjacentHTML('beforeend', cardsHtml);
     }
 
-    // Overview: first 4 cards
+    // Overview: Pikachu is already there as #1, show first 3 API cards
     if (overviewGrid) {
-      overviewGrid.innerHTML = _courtyardCards.slice(0, 4).map((card, i) => buildCardHtml(card, i)).join('');
+      const previewHtml = _courtyardCards.slice(0, 3).map((card, i) =>
+        buildCardHtml(card, i).replace('class="p-card"', 'class="p-card api-card"')
+      ).join('');
+      overviewGrid.insertAdjacentHTML('beforeend', previewHtml);
     }
   }
 
