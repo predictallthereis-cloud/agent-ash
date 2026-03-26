@@ -1157,14 +1157,6 @@
 
         // Update individual card price displays (API cards + Pikachu template)
         updateCardPriceDisplays();
-        // Update the hardcoded Pikachu template price
-        const pikachuCard = _allApiCards.find(c => isPikachuDreamLeague(c));
-        if (pikachuCard && _cardPrices[pikachuCard.tokenId]?.price) {
-          const pp = _cardPrices[pikachuCard.tokenId].price;
-          document.querySelectorAll('.pikachu-price').forEach(el => {
-            el.textContent = '$' + pp.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-          });
-        }
 
         // Recalc net worth
         updateNetWorth(_ethValue);
@@ -1195,7 +1187,7 @@
   }
 
   function updateCardPriceDisplays() {
-    // Update price on each rendered card in the grids
+    // Update price on each rendered API card in the grids
     document.querySelectorAll('.p-card').forEach(cardEl => {
       const onclick = cardEl.getAttribute('onclick') || '';
       const match = onclick.match(/openCardDetail\((\d+)\)/);
@@ -1210,6 +1202,15 @@
         priceEl.style.color = '';
       }
     });
+
+    // Update hardcoded Pikachu template price
+    const pikachuCard = _allApiCards.find(c => isPikachuDreamLeague(c));
+    if (pikachuCard && _cardPrices[pikachuCard.tokenId]?.price) {
+      const pp = _cardPrices[pikachuCard.tokenId].price;
+      const fmt = '$' + pp.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      document.querySelectorAll('.pikachu-price').forEach(el => { el.textContent = fmt; });
+      console.log('[Prices] Pikachu template updated:', fmt);
+    }
   }
 
   function getCardPrice(tokenId) {
@@ -1617,7 +1618,8 @@
   // Refresh ETH price + wallet balance every 60s
   setInterval(fetchEthPrice, 60000);
   setInterval(fetchWalletBalance, 60000);
-  setInterval(fetchPolygonWallet, 60000);
+  // Polygon wallet every 5 minutes (not 60s — avoid spamming Railway)
+  setInterval(fetchPolygonWallet, 300000);
 </script>
 </body>
 </html>

@@ -119,12 +119,12 @@ async function scrapePrice() {
 
 // ── SCRAPE ALL CARD PRICES ──
 async function scrapePriceFromPage(page, url) {
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForFunction(
     () => document.body.innerText.includes('$'),
-    { timeout: 20000 }
+    { timeout: 30000 }
   ).catch(() => {});
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 3000));
 
   return page.evaluate(() => {
     // Strategy 1: DOM traversal for "Market Value"
@@ -195,22 +195,31 @@ async function scrapeAllPrices() {
       // Delay between scrapes to not hammer Courtyard
       if (i > 0) await new Promise(r => setTimeout(r, 3000));
 
-      try {
-        console.log(`[prices] (${i + 1}/${cardsWithUrl.length}) Scraping ${card.name.slice(0, 50)}...`);
-        const price = await scrapePriceFromPage(page, card.external_url);
-
-        if (price && price > 0) {
-          prices[card.tokenId] = { price, name: card.name };
-          total += price;
-          success++;
-          console.log(`[prices] OK: $${price.toFixed(2)}`);
-        } else {
-          prices[card.tokenId] = { price: null, name: card.name };
+      let price = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          console.log(`[prices] (${i + 1}/${cardsWithUrl.length}) attempt ${attempt} — ${card.name.slice(0, 50)}...`);
+          price = await scrapePriceFromPage(page, card.external_url);
+          if (price && price > 0) {
+            console.log(`[prices] OK: $${price.toFixed(2)}`);
+            break;
+          }
           console.log(`[prices] No price found on page`);
+        } catch (err) {
+          console.error(`[prices] attempt ${attempt} FAIL: ${err.message}`);
+          if (attempt < 2) {
+            console.log(`[prices] Retrying in 5s...`);
+            await new Promise(r => setTimeout(r, 5000));
+          }
         }
-      } catch (err) {
+      }
+
+      if (price && price > 0) {
+        prices[card.tokenId] = { price, name: card.name };
+        total += price;
+        success++;
+      } else {
         prices[card.tokenId] = { price: null, name: card.name };
-        console.error(`[prices] FAIL ${card.tokenId}: ${err.message}`);
       }
     }
 
