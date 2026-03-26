@@ -436,6 +436,86 @@ async function refreshCards() {
   }
 }
 
+// ── ACTIVITY ──
+let cachedActivity = { activity: [], updated: null };
+
+async function refreshActivity() {
+  console.log('[activity] Refreshing activity...');
+  const apiKey = process.env.POLYGONSCAN_API_KEY || '';
+  const base = 'https://api.etherscan.io/v2/api';
+  const wallet = NFT_WALLET.toLowerCase();
+
+  try {
+    // Fetch NFT transfers and ERC-20 transfers in parallel
+    const [nftRes, erc20Res] = await Promise.all([
+      fetchWithTimeout(`${base}?chainid=137&module=account&action=tokennfttx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`),
+      fetchWithTimeout(`${base}?chainid=137&module=account&action=tokentx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`),
+    ]);
+
+    const nftData = await nftRes.json();
+    const erc20Data = await erc20Res.json();
+
+    const nftTxs = (nftData.status === '1' && Array.isArray(nftData.result)) ? nftData.result : [];
+    const erc20Txs = (erc20Data.status === '1' && Array.isArray(erc20Data.result)) ? erc20Data.result : [];
+
+    // Build a map of tx hash → USDC amount (for price matching)
+    const USDC_CONTRACTS = [
+      '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
+      '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
+    ];
+    const priceByHash = {};
+    for (const tx of erc20Txs) {
+      if (USDC_CONTRACTS.includes(tx.contractAddress.toLowerCase())) {
+        const amount = parseInt(tx.value || '0') / 1e6;
+        if (amount > 0) {
+          priceByHash[tx.hash.toLowerCase()] = {
+            amount,
+            token: tx.tokenSymbol || 'USDC',
+          };
+        }
+      }
+    }
+
+    // Build card name lookup from cached cards
+    const cardNames = {};
+    for (const card of (cachedCards.cards || [])) {
+      cardNames[card.tokenId] = card.name;
+    }
+
+    // Filter for Courtyard NFT transfers only
+    const courtyardNfts = nftTxs.filter(tx =>
+      (tx.tokenName || '').toLowerCase().includes('courtyard')
+    );
+
+    const activity = courtyardNfts.map(tx => {
+      const isReceive = tx.to.toLowerCase() === wallet;
+      const tokenId = tx.tokenID;
+      const cardName = cardNames[tokenId] || tx.tokenName || `Token #${tokenId}`;
+      const priceInfo = priceByHash[tx.hash.toLowerCase()];
+
+      return {
+        type: isReceive ? 'received' : 'sent',
+        cardName,
+        tokenId,
+        hash: tx.hash,
+        from: tx.from,
+        to: tx.to,
+        timestamp: parseInt(tx.timeStamp || '0'),
+        price: priceInfo ? priceInfo.amount : null,
+        priceToken: priceInfo ? priceInfo.token : null,
+      };
+    });
+
+    // Sort newest first
+    activity.sort((a, b) => b.timestamp - a.timestamp);
+
+    cachedActivity = { activity, count: activity.length, updated: new Date().toISOString() };
+    console.log(`[activity] Cached ${activity.length} NFT transfers (${Object.keys(priceByHash).length} with USDC prices)`);
+  } catch (err) {
+    console.error('[activity] Refresh failed:', err.message);
+  }
+}
+
 // ── ROUTES ──
 app.get('/price', (req, res) => {
   res.json(cachedPrice);
@@ -447,6 +527,10 @@ app.get('/courtyard-cards', (req, res) => {
 
 app.get('/prices', (req, res) => {
   res.json(cachedPrices);
+});
+
+app.get('/activity', (req, res) => {
+  res.json(cachedActivity);
 });
 
 // ── POLYGON BALANCE via PolygonScan API ──
@@ -490,18 +574,20 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`[server] Listening on port ${PORT}`);
 
-  // Fetch NFT cards first, then scrape all prices
+  // Fetch NFT cards first, then scrape prices + build activity
   refreshCards().then(() => {
     scrapeAllPrices();
+    refreshActivity();
   });
 
   // Also run legacy single-card scrape for backwards compat
   scrapePrice();
 
-  // Re-scrape prices every 6 hours, refresh cards every 12 hours
+  // Re-scrape prices every 6 hours, refresh cards + activity every 12 hours
   setInterval(scrapePrice, SIX_HOURS);
   setInterval(async () => {
     await refreshCards();
     scrapeAllPrices();
+    refreshActivity();
   }, TWELVE_HOURS);
 });

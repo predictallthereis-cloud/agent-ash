@@ -579,7 +579,7 @@
         </span>
         <span class="tag t-green">✓ Polygon Verified</span>
         <span class="tag t-blue">Lvl 100 · Trainer</span>
-        <span class="tag" id="profile-txn-count">14 Txn</span>
+        <span class="tag" id="profile-txn-count">— Txn</span>
       </div>
     </div>
     <div class="profile-worth">
@@ -626,7 +626,7 @@
       </div>
       <div class="metric">
         <div class="metric-id">SYS_05</div>
-        <div class="metric-val" id="metric-txn-val">14</div>
+        <div class="metric-val" id="metric-txn-val">—</div>
         <div class="metric-name">Transactions</div>
         <div class="metric-sub">All time</div>
       </div>
@@ -721,41 +721,12 @@
 
     <div class="act-filters">
       <button class="act-filter active" onclick="filterActivity(this,'all')">All</button>
-      <button class="act-filter" onclick="filterActivity(this,'buy')">Buys</button>
-      <button class="act-filter" onclick="filterActivity(this,'receive')">Received</button>
-      <button class="act-filter" onclick="filterActivity(this,'send')">Sent</button>
+      <button class="act-filter" onclick="filterActivity(this,'received')">Received</button>
+      <button class="act-filter" onclick="filterActivity(this,'sent')">Sent</button>
     </div>
 
     <div class="activity-list" id="activityList">
-
-      <!-- Pinned: Card purchase -->
-      <div class="act-item pinned" data-type="buy">
-        <div class="act-icon buy">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#2A8A52" stroke-width="2">
-            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <path d="M16 10a4 4 0 01-8 0"/>
-          </svg>
-        </div>
-        <div class="act-body">
-          <div class="act-title">Bought — Pikachu Full Art PSA 10 #054 Dream League</div>
-          <div class="act-meta">
-            Card Purchase · via Courtyard.io &nbsp;·&nbsp;
-            <a href="https://polygonscan.com/tx/0xabc123" target="_blank" class="act-hash">
-              0xabc1...23ef
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
-            </a>
-          </div>
-        </div>
-        <div class="act-right">
-          <div class="act-amount red">−$400.00</div>
-          <div class="act-date">Mar 14, 2025 · 14:32</div>
-        </div>
-      </div>
-
-      <!-- Live transactions injected here -->
-      <div id="live-activity"></div>
-
+      <div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">Loading activity...</div>
     </div>
   </div><!-- /activity -->
 
@@ -1186,116 +1157,85 @@
     }
   }
 
-  // ── ACTIVITY — Basescan txlist + Blockscout token-transfers ──
-  const KNOWN_TOKENS = {
-    '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913': { symbol: 'USDC', decimals: 6, stable: true },
-    '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca': { symbol: 'USDbC', decimals: 6, stable: true },
-    '0x50c5725949a6f0c72e6c4a641f24049a917db0cb': { symbol: 'DAI',  decimals: 18, stable: true },
-  };
-
-  function renderActivity(txns) {
-    const container = document.getElementById('live-activity');
-    const svgReceive = '<svg viewBox="0 0 24 24" fill="none" stroke="#2A70B8" stroke-width="2"><path d="M12 2v20M2 12l10 10 10-10"/></svg>';
-    const svgSend = '<svg viewBox="0 0 24 24" fill="none" stroke="#C03428" stroke-width="2"><path d="M12 22V2M22 12L12 2 2 12"/></svg>';
-
-    if (txns.length === 0) {
-      container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">No transactions found</div>';
-      return;
-    }
-
-    container.innerHTML = txns.map(tx => {
-      const icon = tx.isSend ? svgSend : svgReceive;
-      const iconClass = tx.isSend ? 'send' : 'receive';
-      const type = tx.isSend ? 'send' : 'receive';
-      const title = tx.isSend ? 'Sent' : 'Received';
-      const hashShort = tx.hash.slice(0,6) + '...' + tx.hash.slice(-4);
-
-      return `<div class="act-item" data-type="${type}">
-        <div class="act-icon ${iconClass}">${icon}</div>
-        <div class="act-body">
-          <div class="act-title">${title}</div>
-          <div class="act-meta">
-            Transfer · Polygon &nbsp;·&nbsp;
-            <a href="https://polygonscan.com/tx/${tx.hash}" target="_blank" class="act-hash">
-              ${hashShort}
-              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
-            </a>
-          </div>
-        </div>
-        <div class="act-right">
-          <div class="act-amount ${tx.amountClass}">${tx.amount}</div>
-          <div class="act-date">${tx.dateStr}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    // Re-apply current filter
-    const activeFilter = document.querySelector('.act-filter.active');
-    if (activeFilter) {
-      const label = activeFilter.textContent.trim();
-      const typeMap = { 'All':'all', 'Buys':'buy', 'Received':'receive', 'Sent':'send' };
-      filterActivity(activeFilter, typeMap[label] || 'all');
-    }
-  }
-
-  function parseBasescanTxns(results) {
-    const addrLower = CONFIG.WALLET_ADDRESS.toLowerCase();
-    return results.map(tx => {
-      const isSend = tx.from.toLowerCase() === addrLower;
-      const sign = isSend ? '−' : '+';
-      let amount, amountClass = isSend ? 'red' : 'green';
-
-      // Check if tx.to is a known token contract (ERC-20 transfer)
-      const tokenInfo = KNOWN_TOKENS[tx.to.toLowerCase()];
-      if (tokenInfo && tx.input && tx.input.startsWith('0xa9059cbb')) {
-        // Decode transfer(address,uint256) — last 32 bytes = amount
-        const rawHex = tx.input.slice(74); // skip 0xa9059cbb + 32-byte address
-        const rawVal = parseInt(rawHex, 16) / Math.pow(10, tokenInfo.decimals);
-        if (tokenInfo.stable) {
-          amount = sign + '$' + rawVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ' + tokenInfo.symbol;
-        } else {
-          amount = sign + rawVal.toFixed(5) + ' ' + tokenInfo.symbol;
-        }
-      } else {
-        const ethAmt = parseFloat(tx.value) / 1e18;
-        if (ethAmt > 0) {
-          amount = sign + ethAmt.toFixed(5) + ' ETH';
-        } else {
-          amount = 'Contract call';
-          amountClass = 'amber';
-        }
-      }
-
-      const date = new Date(parseInt(tx.timeStamp) * 1000);
-      const dateStr = date.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
-        + ' · ' + date.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
-
-      return { hash: tx.hash, isSend, amount, amountClass, dateStr };
-    });
-  }
+  // ── ACTIVITY — from Railway /activity endpoint ──
+  const ACTIVITY_API = 'https://agent-ash-production.up.railway.app/activity';
 
   async function fetchActivity() {
-    if (!CONFIG.WALLET_ADDRESS) return;
-    const container = document.getElementById('live-activity');
-    container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">Loading transactions...</div>';
+    const container = document.getElementById('activityList');
+    container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">Loading activity...</div>';
 
     try {
-      const url = `https://api.polygonscan.com/api?module=account&action=txlist&address=${CONFIG.WALLET_ADDRESS}&startblock=0&endblock=99999999&page=1&offset=10&sort=desc&apikey=${''}`;
-      console.log('[Activity] Fetching:', url);
-      const res = await fetch(url);
+      const res = await fetch(ACTIVITY_API);
       const data = await res.json();
-      console.log('[Activity] Response:', data);
-      if (data.status === '1' && data.result && data.result.length > 0) {
-        const txns = parseBasescanTxns(data.result);
-        console.log('[Activity] Parsed txns:', txns);
-        renderActivity(txns);
+      const txns = data.activity || [];
+
+      // Update txn count badge
+      const profileTxn = document.getElementById('profile-txn-count');
+      if (profileTxn) profileTxn.textContent = txns.length + ' Txn';
+      const txnMetric = document.getElementById('metric-txn-val');
+      if (txnMetric) txnMetric.textContent = txns.length;
+
+      if (txns.length === 0) {
+        container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">No activity found</div>';
         return;
       }
-      console.warn('[Activity] No results in response:', data);
-      container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">No transactions found</div>';
+
+      const svgReceive = '<svg viewBox="0 0 24 24" fill="none" stroke="#2A70B8" stroke-width="2"><path d="M12 2v20M2 12l10 10 10-10"/></svg>';
+      const svgSend = '<svg viewBox="0 0 24 24" fill="none" stroke="#C03428" stroke-width="2"><path d="M12 22V2M22 12L12 2 2 12"/></svg>';
+      const linkSvg = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>';
+
+      container.innerHTML = txns.map(tx => {
+        const isReceive = tx.type === 'received';
+        const icon = isReceive ? svgReceive : svgSend;
+        const iconClass = isReceive ? 'receive' : 'send';
+        const shortName = (tx.cardName || '').replace(/^Courtyard\s*/i, '').slice(0, 60);
+        const title = (isReceive ? 'Received' : 'Sent') + ' — ' + (shortName || 'NFT');
+        const hashShort = tx.hash.slice(0, 6) + '...' + tx.hash.slice(-4);
+        const fromShort = tx.from.slice(0, 6) + '...' + tx.from.slice(-4);
+
+        const date = new Date(tx.timestamp * 1000);
+        const dateStr = date.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+          + ' · ' + date.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+
+        let priceHtml = '';
+        if (tx.price) {
+          const sign = isReceive ? '+' : '−';
+          const cls = isReceive ? 'green' : 'red';
+          priceHtml = `<div class="act-amount ${cls}">${sign}$${tx.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>`;
+        } else {
+          priceHtml = '<div class="act-amount amber">NFT Transfer</div>';
+        }
+
+        return `<div class="act-item" data-type="${tx.type}">
+          <div class="act-icon ${iconClass}">${icon}</div>
+          <div class="act-body">
+            <div class="act-title">${title}</div>
+            <div class="act-meta">
+              via Courtyard.io · ${fromShort} &nbsp;·&nbsp;
+              <a href="https://polygonscan.com/tx/${tx.hash}" target="_blank" class="act-hash">
+                ${hashShort} ${linkSvg}
+              </a>
+            </div>
+          </div>
+          <div class="act-right">
+            ${priceHtml}
+            <div class="act-date">${dateStr}</div>
+          </div>
+        </div>`;
+      }).join('');
+
+      // Re-apply current filter
+      const activeFilter = document.querySelector('.act-filter.active');
+      if (activeFilter) {
+        const label = activeFilter.textContent.trim();
+        const typeMap = { 'All':'all', 'Buys':'buy', 'Received':'received', 'Sent':'sent' };
+        filterActivity(activeFilter, typeMap[label] || 'all');
+      }
+
+      console.log('[Activity] Rendered', txns.length, 'transactions');
     } catch(e) {
       console.warn('[Activity] Fetch failed:', e);
-      container.innerHTML = '<div style="padding:18px;color:var(--red);font-size:.8rem;text-align:center">Failed to load transactions — check console</div>';
+      container.innerHTML = '<div style="padding:18px;color:var(--red);font-size:.8rem;text-align:center">Failed to load activity</div>';
     }
   }
 
