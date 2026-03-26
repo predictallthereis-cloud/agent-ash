@@ -548,7 +548,7 @@
   </ul>
   <div class="nav-status">
     <span class="live"></span>
-    Base · Polygon
+    Polygon
   </div>
 </nav>
 
@@ -566,7 +566,7 @@
       <img src="1773611727423_image.png" alt="Agent Ash" />
     </div>
     <div class="profile-text">
-      <div class="profile-eyebrow">// Unit_01 · Autonomous · Base Network</div>
+      <div class="profile-eyebrow">// Unit_01 · Autonomous · Polygon Network</div>
       <div class="profile-name">Agent <span>Ash</span></div>
       <div class="profile-sub">Autonomous Onchain Pokémon Trainer</div>
       <div class="profile-worth-mobile">
@@ -576,9 +576,9 @@
       <div class="profile-tags">
         <span class="tag" onclick="copyWallet()">
           <span class="tdot"></span>
-          <span id="walletLabel">0x1a2b...3c4d</span> ⎘
+          <span id="walletLabel">0x028E...d21f</span> ⎘
         </span>
-        <span class="tag t-green">✓ Base Verified</span>
+        <span class="tag t-green">✓ Polygon Verified</span>
         <span class="tag t-blue">Lvl 100 · Trainer</span>
         <span class="tag" id="profile-txn-count">14 Txn</span>
       </div>
@@ -598,21 +598,21 @@
     <div class="sec">
       <span class="sec-label">Onchain Overview</span>
       <span class="sec-line"></span>
-      <span class="sec-tag">Base Network</span>
+      <span class="sec-tag">Polygon Network</span>
     </div>
 
     <div class="metrics">
       <div class="metric">
         <div class="metric-id">SYS_01</div>
-        <div class="metric-val blue" id="metric-eth-val">0.420</div>
-        <div class="metric-name">ETH Balance <span id="eth-live" style="font-family:'JetBrains Mono',monospace;font-size:.45rem;margin-left:4px;color:var(--muted)">● —</span></div>
-        <div class="metric-sub" id="metric-eth-sub">≈ $1,264.80</div>
+        <div class="metric-val blue" id="metric-pol-val">0.00</div>
+        <div class="metric-name">POL Balance</div>
+        <div class="metric-sub" id="metric-pol-sub">≈ $0.00</div>
       </div>
       <div class="metric">
         <div class="metric-id">SYS_02</div>
-        <div class="metric-val" id="metric-usdc-val">$850</div>
+        <div class="metric-val" id="metric-usdc-val">$0</div>
         <div class="metric-name">USDC Reserve</div>
-        <div class="metric-sub">Stablecoin</div>
+        <div class="metric-sub">Polygon</div>
       </div>
       <div class="metric">
         <div class="metric-id">SYS_03</div>
@@ -645,17 +645,6 @@
           <tr><th>Asset</th><th>Amount</th><th>Price</th><th>Value</th><th>24h</th></tr>
         </thead>
         <tbody>
-          <tr>
-            <td><div class="asset-cell"><div class="a-icon a-eth">ETH</div><div><div class="a-name">Ethereum</div><div class="a-net">BASE · ETH</div></div></div></td>
-            <td class="r wallet-eth-bal">0.42000</td><td class="r eth-price">$3,011.43</td><td class="val eth-value">$1,264.80</td><td class="eth-change up">+1.8%</td>
-          </tr>
-          <tr>
-            <td><div class="asset-cell"><div class="a-icon a-usdc">USDC</div><div><div class="a-name">USD Coin</div><div class="a-net">BASE · USDC</div></div></div></td>
-            <td class="r" id="usdc-amount">850.00</td><td class="r">$1.00</td><td class="val" id="usdc-value">$850.00</td><td class="up">+0.01%</td>
-          </tr>
-          <tr class="table-section-row">
-            <td colspan="5" style="padding:8px 20px;background:var(--panel2);font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Polygon Network</td>
-          </tr>
           <tr>
             <td><div class="asset-cell"><div class="a-icon a-pol">POL</div><div><div class="a-name">POL (ex-MATIC)</div><div class="a-net">POLYGON · POL</div></div></div></td>
             <td class="r" id="pol-amount">0.00</td><td class="r" id="pol-price">$0.00</td><td class="val" id="pol-value">$0.00</td><td class="na">—</td>
@@ -754,7 +743,7 @@
           <div class="act-title">Bought — Pikachu Full Art PSA 10 #054 Dream League</div>
           <div class="act-meta">
             Card Purchase · via Courtyard.io &nbsp;·&nbsp;
-            <a href="https://basescan.org/tx/0xabc123" target="_blank" class="act-hash">
+            <a href="https://polygonscan.com/tx/0xabc123" target="_blank" class="act-hash">
               0xabc1...23ef
               <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
             </a>
@@ -776,9 +765,9 @@
 
 <!-- FOOTER -->
 <footer>
-  <p>Agent Ash · Base Network · 2025</p>
+  <p>Agent Ash · Polygon Network · 2026</p>
   <div class="f-links">
-    <a href="#">Basescan ↗</a>
+    <a href="#">PolygonScan ↗</a>
     <a href="#">Twitter ↗</a>
     <a href="#">Discord ↗</a>
   </div>
@@ -969,68 +958,17 @@
   // LIVE DATA CONFIG — fill these in
   // ═══════════════════════════════════════════════════
   const CONFIG = {
-    // Card price (PSA 10) — update manually from pricecharting.com
-    CARD_PRICE: 378.00,
-    CARD_PRICE_UPDATED: 'Mar 15, 2025',
-
-    // USDC stablecoin balance
-    USDC_BALANCE: 850.00,
-
-    // Your Base wallet address (to fetch real ETH/USDC balance)
-    WALLET_ADDRESS: '0xe2a31c0285DAb75B461937CA649A79A7A132591F',
-    POLYGON_WALLET: '0x028Edd38341280e3e322D75C09b90E420572d21f',
+    WALLET_ADDRESS: '0x028Edd38341280e3e322D75C09b90E420572d21f',
     POLYGON_USDC: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
   };
   // ═══════════════════════════════════════════════════
 
   // Shared live balances
-  let _ethBal = 0.420;   // updated by fetchWalletBalance
-  let _usdcBal = CONFIG.USDC_BALANCE; // updated by fetchWalletBalance
   let _polBal = 0;
   let _polyUsdcBal = 0;
   let _polPrice = 0;
   let _courtyardCards = [];  // all cards from API
   let _cardPrices = {};      // tokenId -> { price, name }
-
-  // ── LIVE ETH PRICE via Binance (no key, CORS OK) ──
-  async function fetchEthPrice() {
-    try {
-      const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT');
-      const data = await res.json();
-      const price = parseFloat(data.lastPrice);
-      const change = parseFloat(data.priceChangePercent);
-
-      const ethVal = (_ethBal * price).toFixed(2);
-
-      // Update all ETH price references
-      document.querySelectorAll('.eth-price').forEach(el => el.textContent = '$' + price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}));
-      document.querySelectorAll('.eth-value').forEach(el => el.textContent = '$' + parseFloat(ethVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}));
-      document.querySelectorAll('.eth-change').forEach(el => {
-        const pct = change.toFixed(2);
-        el.textContent = (change >= 0 ? '+' : '') + pct + '%';
-        el.className = el.className.replace(/\bup\b|\bdn\b/, '') + (change >= 0 ? ' up' : ' dn');
-      });
-
-      // Update the ETH metric card
-      const ethMetric = document.getElementById('metric-eth-val');
-      if (ethMetric) ethMetric.textContent = _ethBal.toFixed(5);
-
-      const ethMetricSub = document.getElementById('metric-eth-sub');
-      if (ethMetricSub) ethMetricSub.textContent = '≈ $' + parseFloat(ethVal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-
-      // Update SYS_05 — 24h change from Binance
-      update24hFromBinance(change, _ethBal * price);
-
-      // Recalculate net worth
-      updateNetWorth(parseFloat(ethVal));
-
-      // Mark ETH as live
-      setLiveIndicator('eth-live', true);
-    } catch(e) {
-      console.warn('ETH price fetch failed:', e);
-      setLiveIndicator('eth-live', false);
-    }
-  }
 
   // ── CARD PRICES — fetch all from /prices endpoint ──
   const PRICES_API = 'https://agent-ash-production.up.railway.app/prices';
@@ -1064,7 +1002,7 @@
         updateCardPriceDisplays();
 
         // Recalc net worth
-        updateNetWorth(_ethValue);
+        updateNetWorth();
 
         console.log('[Prices] Got prices for', Object.keys(_cardPrices).length, 'cards, total $' + _cardValue.toFixed(2));
         return;
@@ -1083,7 +1021,7 @@
           el.textContent = '$' + _cardValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
         });
         setLiveIndicator('card-live', true);
-        updateNetWorth(_ethValue);
+        updateNetWorth();
         console.log('[Prices] Fallback /price:', data.price);
       }
     } catch(e) {
@@ -1115,86 +1053,7 @@
     return info && info.price ? info.price : null;
   }
 
-  // ── WALLET BALANCE via Base public RPC ──
-  const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-
-  async function fetchWalletBalance() {
-    if (!CONFIG.WALLET_ADDRESS) return;
-    const addr = CONFIG.WALLET_ADDRESS.toLowerCase().replace('0x', '');
-    try {
-      // Batch: eth_getBalance + USDC balanceOf via eth_call
-      // balanceOf(address) selector = 0x70a08231, address padded to 32 bytes
-      const balanceOfData = '0x70a08231' + addr.padStart(64, '0');
-
-      const [ethRes, usdcRes, txnRes] = await Promise.all([
-        fetch('https://mainnet.base.org', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0', method: 'eth_getBalance',
-            params: [CONFIG.WALLET_ADDRESS, 'latest'], id: 1
-          })
-        }),
-        fetch('https://mainnet.base.org', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0', method: 'eth_call',
-            params: [{ to: USDC_CONTRACT, data: balanceOfData }, 'latest'], id: 2
-          })
-        }),
-        fetch('https://mainnet.base.org', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0', method: 'eth_getTransactionCount',
-            params: [CONFIG.WALLET_ADDRESS, 'latest'], id: 3
-          })
-        })
-      ]);
-
-      const ethData = await ethRes.json();
-      const usdcData = await usdcRes.json();
-      const txnData = await txnRes.json();
-
-      // Parse ETH balance (18 decimals)
-      const ethWei = parseInt(ethData.result, 16);
-      _ethBal = ethWei / 1e18;
-
-      // Parse USDC balance (6 decimals)
-      const usdcRaw = parseInt(usdcData.result, 16);
-      _usdcBal = usdcRaw / 1e6;
-
-      // Update ETH amount in table and metric card
-      document.querySelectorAll('.wallet-eth-bal').forEach(el => el.textContent = _ethBal.toFixed(5));
-      const ethMetric = document.getElementById('metric-eth-val');
-      if (ethMetric) ethMetric.textContent = _ethBal.toFixed(5);
-
-      // Update USDC amount/value in table and metric card
-      const usdcFmt = _usdcBal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-      const usdcAmountEl = document.getElementById('usdc-amount');
-      if (usdcAmountEl) usdcAmountEl.textContent = _usdcBal.toFixed(2);
-      const usdcValueEl = document.getElementById('usdc-value');
-      if (usdcValueEl) usdcValueEl.textContent = '$' + usdcFmt;
-      const usdcMetricEl = document.getElementById('metric-usdc-val');
-      if (usdcMetricEl) usdcMetricEl.textContent = '$' + usdcFmt;
-
-      // Update transaction count
-      const txnCount = parseInt(txnData.result, 16);
-      const txnEl = document.getElementById('metric-txn-val');
-      if (txnEl) txnEl.textContent = txnCount;
-      const profileTxn = document.getElementById('profile-txn-count');
-      if (profileTxn) profileTxn.textContent = txnCount + ' Txn';
-
-      // Re-run ETH price calc with updated balance
-      fetchEthPrice();
-    } catch(e) {
-      console.warn('RPC fetch failed:', e);
-    }
-  }
-
-  // ── POLYGON WALLET via Polygon RPC ──
-  // ── POLYGON WALLET via Railway backend (avoids CORS on polygon-rpc.com) ──
+  // ── WALLET BALANCE via Railway backend ──
   const POLYGON_BALANCE_API = 'https://agent-ash-production.up.railway.app/polygon-balance';
 
   async function fetchPolygonWallet() {
@@ -1206,10 +1065,16 @@
       _polBal = data.pol || 0;
       _polyUsdcBal = data.usdc || 0;
 
-      // Update POL balance in table
+      // Update POL balance in table + metric
       document.getElementById('pol-amount').textContent = _polBal.toFixed(4);
+      const polMetric = document.getElementById('metric-pol-val');
+      if (polMetric) polMetric.textContent = _polBal.toFixed(4);
+
+      // Update USDC in table + metric
       document.getElementById('poly-usdc-amount').textContent = _polyUsdcBal.toFixed(2);
       document.getElementById('poly-usdc-value').textContent = '$' + _polyUsdcBal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      const usdcMetric = document.getElementById('metric-usdc-val');
+      if (usdcMetric) usdcMetric.textContent = '$' + _polyUsdcBal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 
       // Fetch POL price from Binance
       try {
@@ -1219,9 +1084,11 @@
         const polValue = _polBal * _polPrice;
         document.getElementById('pol-price').textContent = '$' + _polPrice.toFixed(4);
         document.getElementById('pol-value').textContent = '$' + polValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        const polSub = document.getElementById('metric-pol-sub');
+        if (polSub) polSub.textContent = '≈ $' + polValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
       } catch(e) { console.warn('POL price fetch failed:', e); }
 
-      updateNetWorth(_ethValue);
+      updateNetWorth();
     } catch(e) {
       console.warn('Polygon balance fetch failed:', e);
     }
@@ -1348,8 +1215,8 @@
         <div class="act-body">
           <div class="act-title">${title}</div>
           <div class="act-meta">
-            Transfer · Base Mainnet &nbsp;·&nbsp;
-            <a href="https://basescan.org/tx/${tx.hash}" target="_blank" class="act-hash">
+            Transfer · Polygon &nbsp;·&nbsp;
+            <a href="https://polygonscan.com/tx/${tx.hash}" target="_blank" class="act-hash">
               ${hashShort}
               <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>
             </a>
@@ -1413,7 +1280,7 @@
     container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">Loading transactions...</div>';
 
     try {
-      const url = `https://base.blockscout.com/api?module=account&action=txlist&address=${CONFIG.WALLET_ADDRESS}&startblock=0&endblock=99999999&page=1&offset=10&sort=desc`;
+      const url = `https://api.polygonscan.com/api?module=account&action=txlist&address=${CONFIG.WALLET_ADDRESS}&startblock=0&endblock=99999999&page=1&offset=10&sort=desc&apikey=${''}`;
       console.log('[Activity] Fetching:', url);
       const res = await fetch(url);
       const data = await res.json();
@@ -1432,43 +1299,15 @@
     }
   }
 
-  let _ethValue = 1264.80;
-  let _cardValue = 1200.00;
+  let _cardValue = 0;
 
-  // ── 24h CHANGE — direct from Binance API ──
-  function update24hFromBinance(changePct, ethValueUsd) {
-    const up = changePct >= 0;
-    const sign = up ? '+' : '';
-    const pctStr = sign + changePct.toFixed(2) + '%';
-    const dollarChange = ethValueUsd * (changePct / 100);
-    const dollarStr = sign + '$' + Math.abs(dollarChange).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-
-    const pctEl = document.getElementById('metric-24h-pct');
-    if (pctEl) {
-      pctEl.textContent = pctStr;
-      pctEl.className = 'metric-val ' + (up ? 'green' : 'red');
-    }
-    const valEl = document.getElementById('metric-24h-val');
-    if (valEl) {
-      valEl.textContent = dollarStr;
-      valEl.className = 'metric-sub ' + (up ? 'up' : 'dn');
-    }
-
-    // Update both worth-change elements (desktop + mobile)
-    document.querySelectorAll('#worth-change, #worth-change-mobile').forEach(el => {
-      el.textContent = (up ? '▲' : '▼') + ' ' + dollarStr + ' · ' + pctStr + ' (24h)';
-      el.style.color = up ? 'var(--green)' : 'var(--red)';
-    });
-  }
-
-  function updateNetWorth(ethVal) {
-    _ethValue = ethVal;
+  function updateNetWorth() {
     const polValue = _polBal * _polPrice;
-    const total = _ethValue + _usdcBal + _cardValue + polValue + _polyUsdcBal;
+    const onchain = polValue + _polyUsdcBal;
+    const total = onchain + _cardValue;
     document.querySelectorAll('.total-worth-val').forEach(el => {
       el.textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     });
-    const onchain = _ethValue + _usdcBal + polValue + _polyUsdcBal;
     document.querySelectorAll('.onchain-total').forEach(el => {
       el.textContent = '$' + onchain.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     });
@@ -1481,7 +1320,7 @@
     });
     const cardMetricSub = document.getElementById('metric-card-sub');
     if (cardMetricSub) cardMetricSub.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' value';
-    updateNetWorth(_ethValue);
+    updateNetWorth();
   }
 
   function setLiveIndicator(id, isLive) {
@@ -1492,15 +1331,10 @@
   }
 
   // ── INIT: fetch all live data ──
-  fetchEthPrice();
-  fetchWalletBalance();
-  fetchActivity();
   fetchPolygonWallet();
+  fetchActivity();
   fetchCourtyardCards().then(() => fetchAllPrices());
-  // Refresh ETH price + wallet balance every 60s
-  setInterval(fetchEthPrice, 60000);
-  setInterval(fetchWalletBalance, 60000);
-  // Polygon wallet every 5 minutes (not 60s — avoid spamming Railway)
+  // Refresh wallet every 5 minutes
   setInterval(fetchPolygonWallet, 300000);
 </script>
 </body>
