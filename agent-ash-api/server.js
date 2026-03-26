@@ -456,7 +456,7 @@ const POLYGON_USDC_BRIDGED = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'; // US
 
 app.get('/polygon-balance', async (req, res) => {
   const apiKey = process.env.POLYGONSCAN_API_KEY || '';
-  const base = 'https://api.polygonscan.com/api';
+  const base = 'https://api.etherscan.io/v2/api?chainid=137';
 
   try {
     const [polRes, usdcNativeRes, usdcBridgedRes] = await Promise.all([
