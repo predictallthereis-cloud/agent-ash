@@ -437,7 +437,7 @@ async function refreshCards() {
 }
 
 // ── ACTIVITY ──
-let cachedActivity = { activity: [], updated: null };
+let cachedActivity = { activity: [], count: 0, updated: null };
 
 async function refreshActivity() {
   console.log('[activity] Refreshing activity...');
@@ -446,7 +446,6 @@ async function refreshActivity() {
   const wallet = NFT_WALLET.toLowerCase();
 
   try {
-    // Fetch NFT transfers and ERC-20 transfers in parallel
     const [nftRes, erc20Res] = await Promise.all([
       fetchWithTimeout(`${base}?chainid=137&module=account&action=tokennfttx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`),
       fetchWithTimeout(`${base}?chainid=137&module=account&action=tokentx&address=${NFT_WALLET}&page=1&offset=200&sort=desc&apikey=${apiKey}`),
@@ -458,59 +457,122 @@ async function refreshActivity() {
     const nftTxs = (nftData.status === '1' && Array.isArray(nftData.result)) ? nftData.result : [];
     const erc20Txs = (erc20Data.status === '1' && Array.isArray(erc20Data.result)) ? erc20Data.result : [];
 
-    // Build a map of tx hash → USDC amount (for price matching)
-    const USDC_CONTRACTS = [
-      '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
-      '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
-    ];
-    const priceByHash = {};
-    for (const tx of erc20Txs) {
-      if (USDC_CONTRACTS.includes(tx.contractAddress.toLowerCase())) {
-        const amount = parseInt(tx.value || '0') / 1e6;
-        if (amount > 0) {
-          priceByHash[tx.hash.toLowerCase()] = {
-            amount,
-            token: tx.tokenSymbol || 'USDC',
-          };
-        }
-      }
-    }
-
-    // Build card name lookup from cached cards
+    // Build card name lookup from cached cards + transfer tokenName fallback
     const cardNames = {};
     for (const card of (cachedCards.cards || [])) {
       cardNames[card.tokenId] = card.name;
     }
 
-    // Filter for Courtyard NFT transfers only
-    const courtyardNfts = nftTxs.filter(tx =>
-      (tx.tokenName || '').toLowerCase().includes('courtyard')
-    );
+    // USDC contract addresses (both native and bridged)
+    const USDC_ADDRS = new Set([
+      '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
+      '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
+    ]);
 
-    const activity = courtyardNfts.map(tx => {
-      const isReceive = tx.to.toLowerCase() === wallet;
-      const tokenId = tx.tokenID;
-      const cardName = cardNames[tokenId] || tx.tokenName || `Token #${tokenId}`;
-      const priceInfo = priceByHash[tx.hash.toLowerCase()];
+    // Group ERC-20 transfers by tx hash
+    const erc20ByHash = {};
+    for (const tx of erc20Txs) {
+      const hash = tx.hash.toLowerCase();
+      if (!erc20ByHash[hash]) erc20ByHash[hash] = [];
+      erc20ByHash[hash].push(tx);
+    }
 
-      return {
-        type: isReceive ? 'received' : 'sent',
-        cardName,
-        tokenId,
-        hash: tx.hash,
-        from: tx.from,
-        to: tx.to,
-        timestamp: parseInt(tx.timeStamp || '0'),
-        price: priceInfo ? priceInfo.amount : null,
-        priceToken: priceInfo ? priceInfo.token : null,
-      };
-    });
+    // Group NFT transfers by tx hash
+    const nftByHash = {};
+    for (const tx of nftTxs) {
+      if (!(tx.tokenName || '').toLowerCase().includes('courtyard')) continue;
+      const hash = tx.hash.toLowerCase();
+      if (!nftByHash[hash]) nftByHash[hash] = [];
+      nftByHash[hash].push(tx);
+    }
+
+    // Collect all unique tx hashes
+    const allHashes = new Set([...Object.keys(nftByHash), ...Object.keys(erc20ByHash)]);
+    const processedHashes = new Set();
+    const activity = [];
+
+    // Process NFT transactions first (may merge with ERC-20)
+    for (const hash of Object.keys(nftByHash)) {
+      processedHashes.add(hash);
+      const nfts = nftByHash[hash];
+      const erc20s = erc20ByHash[hash] || [];
+
+      // Find USDC transfers in this tx
+      const usdcTxs = erc20s.filter(t => USDC_ADDRS.has(t.contractAddress.toLowerCase()));
+      let usdcAmount = 0;
+      let usdcDirection = null;
+      for (const ut of usdcTxs) {
+        const amt = parseInt(ut.value || '0') / 1e6;
+        if (amt > 0) {
+          usdcAmount += amt;
+          usdcDirection = ut.from.toLowerCase() === wallet ? 'out' : 'in';
+        }
+      }
+
+      for (const nft of nfts) {
+        const nftToUs = nft.to.toLowerCase() === wallet;
+        const nftFromZero = nft.from.toLowerCase() === '0x0000000000000000000000000000000000000000';
+        const tokenId = nft.tokenID;
+        const cardName = cardNames[tokenId] || nft.tokenName || `Token #${tokenId}`;
+
+        let type;
+        if (nftToUs && usdcAmount > 0 && usdcDirection === 'out') {
+          type = nftFromZero ? 'mint' : 'trade';
+        } else if (!nftToUs && usdcAmount > 0 && usdcDirection === 'in') {
+          type = 'trade';
+        } else if (nftToUs) {
+          type = 'receive';
+        } else {
+          type = 'send';
+        }
+
+        const counterparty = nftToUs ? nft.from : nft.to;
+
+        activity.push({
+          type,
+          cardName,
+          tokenId,
+          amount: usdcAmount > 0 ? usdcAmount : null,
+          direction: nftToUs ? 'in' : 'out',
+          hash: nft.hash,
+          counterparty,
+          timestamp: parseInt(nft.timeStamp || '0'),
+        });
+      }
+    }
+
+    // Process standalone ERC-20 transfers (no matching NFT)
+    for (const hash of Object.keys(erc20ByHash)) {
+      if (processedHashes.has(hash)) continue;
+      const erc20s = erc20ByHash[hash];
+
+      for (const tx of erc20s) {
+        if (!USDC_ADDRS.has(tx.contractAddress.toLowerCase())) continue;
+        const amt = parseInt(tx.value || '0') / 1e6;
+        if (amt <= 0) continue;
+
+        const isOut = tx.from.toLowerCase() === wallet;
+        activity.push({
+          type: isOut ? 'send' : 'receive',
+          cardName: null,
+          tokenId: null,
+          amount: amt,
+          direction: isOut ? 'out' : 'in',
+          hash: tx.hash,
+          counterparty: isOut ? tx.to : tx.from,
+          timestamp: parseInt(tx.timeStamp || '0'),
+        });
+      }
+    }
 
     // Sort newest first
     activity.sort((a, b) => b.timestamp - a.timestamp);
 
-    cachedActivity = { activity, count: activity.length, updated: new Date().toISOString() };
-    console.log(`[activity] Cached ${activity.length} NFT transfers (${Object.keys(priceByHash).length} with USDC prices)`);
+    // Count unique hashes
+    const uniqueHashes = new Set(activity.map(a => a.hash.toLowerCase()));
+
+    cachedActivity = { activity, count: uniqueHashes.size, updated: new Date().toISOString() };
+    console.log(`[activity] Cached ${activity.length} items (${uniqueHashes.size} unique txns)`);
   } catch (err) {
     console.error('[activity] Refresh failed:', err.message);
   }

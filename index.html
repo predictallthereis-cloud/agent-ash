@@ -236,6 +236,8 @@
 
     /* ─── ACTIVITY ─── */
     .activity-list { display:flex; flex-direction:column; gap:1px; }
+    .act-date-group { font-family:'JetBrains Mono',monospace; font-size:.58rem; letter-spacing:2px; color:var(--muted); text-transform:uppercase; padding:18px 0 8px; }
+    .act-date-group:first-child { padding-top:4px; }
 
     .act-item {
       background:var(--panel);
@@ -721,8 +723,10 @@
 
     <div class="act-filters">
       <button class="act-filter active" onclick="filterActivity(this,'all')">All</button>
-      <button class="act-filter" onclick="filterActivity(this,'received')">Received</button>
-      <button class="act-filter" onclick="filterActivity(this,'sent')">Sent</button>
+      <button class="act-filter" onclick="filterActivity(this,'trade')">Trades</button>
+      <button class="act-filter" onclick="filterActivity(this,'mint')">Mints</button>
+      <button class="act-filter" onclick="filterActivity(this,'send')">Sends</button>
+      <button class="act-filter" onclick="filterActivity(this,'receive')">Receives</button>
     </div>
 
     <div class="activity-list" id="activityList">
@@ -815,6 +819,16 @@
     btn.classList.add('active');
     document.querySelectorAll('.act-item').forEach(item => {
       item.style.display = (type === 'all' || item.dataset.type === type) ? '' : 'none';
+    });
+    // Hide date group headers that have no visible items after them
+    document.querySelectorAll('.act-date-group').forEach(header => {
+      let next = header.nextElementSibling;
+      let hasVisible = false;
+      while (next && !next.classList.contains('act-date-group')) {
+        if (next.classList.contains('act-item') && next.style.display !== 'none') hasVisible = true;
+        next = next.nextElementSibling;
+      }
+      header.style.display = hasVisible ? '' : 'none';
     });
   }
 
@@ -1160,6 +1174,15 @@
   // ── ACTIVITY — from Railway /activity endpoint ──
   const ACTIVITY_API = 'https://agent-ash-production.up.railway.app/activity';
 
+  const ACT_ICONS = {
+    trade:   '<svg viewBox="0 0 24 24" fill="none" stroke="#D4821A" stroke-width="2"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>',
+    mint:    '<svg viewBox="0 0 24 24" fill="none" stroke="#2A8A52" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M6 12h12"/></svg>',
+    send:    '<svg viewBox="0 0 24 24" fill="none" stroke="#C03428" stroke-width="2"><path d="M12 22V2M22 12L12 2 2 12"/></svg>',
+    receive: '<svg viewBox="0 0 24 24" fill="none" stroke="#2A70B8" stroke-width="2"><path d="M12 2v20M2 12l10 10 10-10"/></svg>',
+  };
+  const ACT_ICON_CLASS = { trade:'buy', mint:'buy', send:'send', receive:'receive' };
+  const ACT_LABELS = { trade:'Trade', mint:'Mint', send:'Send', receive:'Receive' };
+
   async function fetchActivity() {
     const container = document.getElementById('activityList');
     container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">Loading activity...</div>';
@@ -1168,71 +1191,90 @@
       const res = await fetch(ACTIVITY_API);
       const data = await res.json();
       const txns = data.activity || [];
+      const txnCount = data.count || txns.length;
 
       // Update txn count badge
       const profileTxn = document.getElementById('profile-txn-count');
-      if (profileTxn) profileTxn.textContent = txns.length + ' Txn';
+      if (profileTxn) profileTxn.textContent = txnCount + ' Txn';
       const txnMetric = document.getElementById('metric-txn-val');
-      if (txnMetric) txnMetric.textContent = txns.length;
+      if (txnMetric) txnMetric.textContent = txnCount;
 
       if (txns.length === 0) {
         container.innerHTML = '<div style="padding:18px;color:var(--muted);font-size:.8rem;text-align:center">No activity found</div>';
         return;
       }
 
-      const svgReceive = '<svg viewBox="0 0 24 24" fill="none" stroke="#2A70B8" stroke-width="2"><path d="M12 2v20M2 12l10 10 10-10"/></svg>';
-      const svgSend = '<svg viewBox="0 0 24 24" fill="none" stroke="#C03428" stroke-width="2"><path d="M12 22V2M22 12L12 2 2 12"/></svg>';
       const linkSvg = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" style="width:10px;height:10px"><path d="M5 2H2v8h8V7M7 1h4v4M10 1L5 6"/></svg>';
 
-      container.innerHTML = txns.map(tx => {
-        const isReceive = tx.type === 'received';
-        const icon = isReceive ? svgReceive : svgSend;
-        const iconClass = isReceive ? 'receive' : 'send';
-        const shortName = (tx.cardName || '').replace(/^Courtyard\s*/i, '').slice(0, 60);
-        const title = (isReceive ? 'Received' : 'Sent') + ' — ' + (shortName || 'NFT');
-        const hashShort = tx.hash.slice(0, 6) + '...' + tx.hash.slice(-4);
-        const fromShort = tx.from.slice(0, 6) + '...' + tx.from.slice(-4);
+      // Group by date
+      let html = '';
+      let lastDateLabel = '';
 
+      for (const tx of txns) {
         const date = new Date(tx.timestamp * 1000);
-        const dateStr = date.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
-          + ' · ' + date.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
+        const dateLabel = date.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+        const timeStr = date.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12:false});
 
-        let priceHtml = '';
-        if (tx.price) {
-          const sign = isReceive ? '+' : '−';
-          const cls = isReceive ? 'green' : 'red';
-          priceHtml = `<div class="act-amount ${cls}">${sign}$${tx.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>`;
-        } else {
-          priceHtml = '<div class="act-amount amber">NFT Transfer</div>';
+        if (dateLabel !== lastDateLabel) {
+          html += `<div class="act-date-group">${dateLabel}</div>`;
+          lastDateLabel = dateLabel;
         }
 
-        return `<div class="act-item" data-type="${tx.type}">
+        const icon = ACT_ICONS[tx.type] || ACT_ICONS.receive;
+        const iconClass = ACT_ICON_CLASS[tx.type] || 'receive';
+        const label = ACT_LABELS[tx.type] || 'Transfer';
+
+        const shortName = tx.cardName ? tx.cardName.replace(/^Courtyard\s*/i, '').slice(0, 55) : null;
+        const hashShort = tx.hash.slice(0, 6) + '...' + tx.hash.slice(-4);
+        const cpShort = tx.counterparty ? tx.counterparty.slice(0, 6) + '...' + tx.counterparty.slice(-4) : '';
+
+        // Title line
+        let title = label;
+        let subtitle = '';
+        if (shortName) {
+          subtitle = shortName;
+        } else if (tx.amount) {
+          subtitle = '$' + tx.amount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' USDC';
+        }
+
+        // Amount display
+        let amountHtml = '';
+        if (tx.amount) {
+          const isMoneyIn = tx.direction === 'in';
+          const sign = isMoneyIn ? '+' : '−';
+          const cls = isMoneyIn ? 'green' : 'red';
+          amountHtml = `<div class="act-amount ${cls}">${sign}$${tx.amount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>`;
+        } else {
+          amountHtml = `<div class="act-amount amber">${label}</div>`;
+        }
+
+        html += `<div class="act-item" data-type="${tx.type}">
           <div class="act-icon ${iconClass}">${icon}</div>
           <div class="act-body">
-            <div class="act-title">${title}</div>
+            <div class="act-title">${title}${subtitle ? ' — ' + subtitle : ''}</div>
             <div class="act-meta">
-              via Courtyard.io · ${fromShort} &nbsp;·&nbsp;
+              ${cpShort} &nbsp;·&nbsp; ${timeStr} &nbsp;·&nbsp;
               <a href="https://polygonscan.com/tx/${tx.hash}" target="_blank" class="act-hash">
                 ${hashShort} ${linkSvg}
               </a>
             </div>
           </div>
           <div class="act-right">
-            ${priceHtml}
-            <div class="act-date">${dateStr}</div>
+            ${amountHtml}
           </div>
         </div>`;
-      }).join('');
+      }
+
+      container.innerHTML = html;
 
       // Re-apply current filter
       const activeFilter = document.querySelector('.act-filter.active');
       if (activeFilter) {
-        const label = activeFilter.textContent.trim();
-        const typeMap = { 'All':'all', 'Buys':'buy', 'Received':'received', 'Sent':'sent' };
-        filterActivity(activeFilter, typeMap[label] || 'all');
+        const type = activeFilter.getAttribute('onclick').match(/'(\w+)'/)?.[1] || 'all';
+        if (type !== 'all') filterActivity(activeFilter, type);
       }
 
-      console.log('[Activity] Rendered', txns.length, 'transactions');
+      console.log('[Activity] Rendered', txns.length, 'items');
     } catch(e) {
       console.warn('[Activity] Fetch failed:', e);
       container.innerHTML = '<div style="padding:18px;color:var(--red);font-size:.8rem;text-align:center">Failed to load activity</div>';
