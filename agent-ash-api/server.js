@@ -9,11 +9,17 @@ const PORT = process.env.PORT || 3001;
 const ASSET_URL = 'https://courtyard.io/asset/8c99487dc8046491286671308b38df7a8e7da26a64cf5f4ae2f6d6c71ec71a52';
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
-// In-memory cache
+// In-memory caches
 let cachedPrice = {
   price: 374.00,
   source: 'fallback',
   updated: new Date().toISOString(),
+};
+
+let cachedPrices = {
+  prices: {},
+  total: 0,
+  updated: null,
 };
 
 app.use(cors());
@@ -106,6 +112,134 @@ async function scrapePrice() {
     }
   } catch (err) {
     console.error('[scraper] Error:', err.message);
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
+// ── SCRAPE ALL CARD PRICES ──
+async function scrapePriceFromPage(page, url) {
+  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+  await page.waitForFunction(
+    () => document.body.innerText.includes('$'),
+    { timeout: 20000 }
+  ).catch(() => {});
+  await new Promise(r => setTimeout(r, 2000));
+
+  return page.evaluate(() => {
+    // Strategy 1: DOM traversal for "Market Value"
+    const allEls = [...document.querySelectorAll('*')];
+    for (const el of allEls) {
+      const text = el.textContent.trim();
+      const ownText = [...el.childNodes]
+        .filter(n => n.nodeType === 3)
+        .map(n => n.textContent).join('');
+      if (/market\s*value/i.test(ownText) || (el.children.length === 0 && /market\s*value/i.test(text))) {
+        const parent = el.closest('div, section, li') || el.parentElement;
+        if (parent) {
+          const m = parent.textContent.match(/Market\s*Value[:\s]*\$([0-9,]+(?:\.\d{2})?)/i);
+          if (m) return parseFloat(m[1].replace(/,/g, ''));
+          const d = parent.textContent.match(/\$([0-9,]+\.\d{2})/);
+          if (d) return parseFloat(d[1].replace(/,/g, ''));
+        }
+      }
+    }
+    // Strategy 2: Full text regex
+    const bodyText = document.body.innerText;
+    const mv = bodyText.match(/Market\s*Value[:\s]*\$([0-9,]+(?:\.\d{2})?)/i);
+    if (mv) return parseFloat(mv[1].replace(/,/g, ''));
+    // Strategy 3: Next line
+    const lines = bodyText.split('\n').map(l => l.trim());
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (/market\s*value/i.test(lines[i])) {
+        const np = lines[i+1].match(/\$([0-9,]+(?:\.\d{2})?)/);
+        if (np) return parseFloat(np[1].replace(/,/g, ''));
+      }
+    }
+    // Strategy 4: Estimated Value
+    const ev = bodyText.match(/Est(?:imated)?\s*Value[:\s]*\$([0-9,]+(?:\.\d{2})?)/i);
+    if (ev) return parseFloat(ev[1].replace(/,/g, ''));
+    return null;
+  });
+}
+
+async function scrapeAllPrices() {
+  // Use the cached cards list
+  const cards = cachedCards.cards || [];
+  if (cards.length === 0) {
+    console.log('[prices] No cards in cache, skipping price scrape');
+    return;
+  }
+
+  const cardsWithUrl = cards.filter(c => c.external_url);
+  console.log(`[prices] Scraping prices for ${cardsWithUrl.length}/${cards.length} cards with external_url...`);
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--disable-software-rasterizer'],
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    );
+
+    const prices = {};
+    let total = 0;
+    let success = 0;
+
+    for (let i = 0; i < cardsWithUrl.length; i++) {
+      const card = cardsWithUrl[i];
+      // Delay between scrapes to not hammer Courtyard
+      if (i > 0) await new Promise(r => setTimeout(r, 3000));
+
+      try {
+        console.log(`[prices] (${i + 1}/${cardsWithUrl.length}) Scraping ${card.name.slice(0, 50)}...`);
+        const price = await scrapePriceFromPage(page, card.external_url);
+
+        if (price && price > 0) {
+          prices[card.tokenId] = { price, name: card.name };
+          total += price;
+          success++;
+          console.log(`[prices] OK: $${price.toFixed(2)}`);
+        } else {
+          prices[card.tokenId] = { price: null, name: card.name };
+          console.log(`[prices] No price found on page`);
+        }
+      } catch (err) {
+        prices[card.tokenId] = { price: null, name: card.name };
+        console.error(`[prices] FAIL ${card.tokenId}: ${err.message}`);
+      }
+    }
+
+    // Also include cards without external_url as null
+    for (const card of cards) {
+      if (!prices[card.tokenId]) {
+        prices[card.tokenId] = { price: null, name: card.name };
+      }
+    }
+
+    cachedPrices = {
+      prices,
+      total,
+      count: cards.length,
+      scraped: success,
+      updated: new Date().toISOString(),
+    };
+
+    // Also update the legacy single-price cache with the Pikachu price if found
+    for (const [tokenId, info] of Object.entries(prices)) {
+      if (info.price && /pikachu/i.test(info.name) && /dream league/i.test(info.name)) {
+        cachedPrice = { price: info.price, source: 'Courtyard Market Value', updated: new Date().toISOString() };
+        break;
+      }
+    }
+
+    console.log(`[prices] Done: ${success}/${cardsWithUrl.length} scraped, total $${total.toFixed(2)}`);
+  } catch (err) {
+    console.error('[prices] Browser error:', err.message);
   } finally {
     if (browser) await browser.close();
   }
@@ -302,6 +436,10 @@ app.get('/courtyard-cards', (req, res) => {
   res.json(cachedCards);
 });
 
+app.get('/prices', (req, res) => {
+  res.json(cachedPrices);
+});
+
 // ── POLYGON BALANCE (server-side to avoid CORS) ──
 const POLYGON_RPC = 'https://polygon-rpc.com';
 const POLYGON_WALLET_ADDR = '0x028Edd38341280e3e322D75C09b90E420572d21f';
@@ -351,11 +489,18 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`[server] Listening on port ${PORT}`);
 
-  // Scrape price on startup + every 6 hours
-  scrapePrice();
-  setInterval(scrapePrice, SIX_HOURS);
+  // Fetch NFT cards first, then scrape all prices
+  refreshCards().then(() => {
+    scrapeAllPrices();
+  });
 
-  // Fetch NFT cards on startup + every 12 hours
-  refreshCards();
-  setInterval(refreshCards, TWELVE_HOURS);
+  // Also run legacy single-card scrape for backwards compat
+  scrapePrice();
+
+  // Re-scrape prices every 6 hours, refresh cards every 12 hours
+  setInterval(scrapePrice, SIX_HOURS);
+  setInterval(async () => {
+    await refreshCards();
+    scrapeAllPrices();
+  }, TWELVE_HOURS);
 });

@@ -687,7 +687,7 @@
         <div class="p-card-body">
           <div class="p-card-grade">PSA 10 · GEM MINT</div>
           <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
-          <div class="p-card-value card-price-val">$1,200.00</div>
+          <div class="p-card-value pikachu-price">$378.00</div>
         </div>
       </div>
     </div>
@@ -734,7 +734,7 @@
         <div class="p-card-body">
           <div class="p-card-grade">PSA 10 · GEM MINT</div>
           <div class="p-card-name">2019 Pokémon Sun &amp; Moon Dream League #054 Pikachu — Full Art</div>
-          <div class="p-card-value card-price-val">$1,200.00</div>
+          <div class="p-card-value pikachu-price">$378.00</div>
         </div>
       </div>
     </div>
@@ -899,10 +899,13 @@
     document.getElementById('d-eyebrow').textContent = '// Card Portfolio · PSA Graded';
     document.getElementById('d-title').textContent = '2019 Pokémon Sun & Moon Dream League #054 Pikachu — Full Art (PSA 10 GEM MINT)';
     const priceEl = document.getElementById('d-price');
-    const livePrice = document.querySelector('.card-price-val')?.textContent || '$378.00';
+    // Find Pikachu's scraped price from _cardPrices
+    const pikachuCard = _allApiCards.find(c => isPikachuDreamLeague(c));
+    const pikachuPrice = pikachuCard ? getCardPrice(pikachuCard.tokenId) : null;
+    const livePrice = pikachuPrice ? '$' + pikachuPrice.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '$378.00';
     priceEl.textContent = livePrice;
     priceEl.style.color = '';
-    priceEl.className = 'detail-price card-price-val';
+    priceEl.className = 'detail-price';
     const dUpd = document.getElementById('d-price-updated');
     if (dUpd) dUpd.textContent = document.getElementById('card-last-updated')?.textContent || '';
 
@@ -960,20 +963,20 @@
     // Title
     document.getElementById('d-title').textContent = shortName;
 
-    // Price — only Pikachu has live price
+    // Price — from /prices scrape
     const priceEl = document.getElementById('d-price');
-    if (isPikachu) {
-      const livePrice = document.querySelector('.card-price-val')?.textContent || '—';
-      priceEl.textContent = livePrice;
+    const cardPrice = getCardPrice(card.tokenId);
+    if (cardPrice) {
+      priceEl.textContent = '$' + cardPrice.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
       priceEl.style.color = '';
-      priceEl.className = 'detail-price card-price-val';
+      priceEl.className = 'detail-price';
     } else {
       priceEl.textContent = '—';
       priceEl.style.color = 'var(--muted)';
       priceEl.className = 'detail-price';
     }
     const dUpd = document.getElementById('d-price-updated');
-    if (dUpd) dUpd.textContent = isPikachu ? (document.getElementById('card-last-updated')?.textContent || '') : '';
+    if (dUpd) dUpd.textContent = document.getElementById('card-last-updated')?.textContent || '';
 
     // Rows
     const rows = [];
@@ -1080,7 +1083,9 @@
   let _polBal = 0;
   let _polyUsdcBal = 0;
   let _polPrice = 0;
-  let _courtyardCards = [];
+  let _courtyardCards = [];  // cards displayed in grid (excludes Pikachu)
+  let _allApiCards = [];     // all cards from API (for price lookups)
+  let _cardPrices = {};      // tokenId -> { price, name }
 
   // ── LIVE ETH PRICE via Binance (no key, CORS OK) ──
   async function fetchEthPrice() {
@@ -1122,57 +1127,94 @@
     }
   }
 
-  // ── CARD PRICE — try price.json first, fall back to CONFIG ──
-  function setCardPrice(price, dateLabel, isLive) {
-    updateCollectionTotal(price);
-    document.getElementById('card-last-updated').textContent = dateLabel;
-    const dUpd = document.getElementById('d-price-updated');
-    if (dUpd) dUpd.textContent = dateLabel;
-    setLiveIndicator('card-live', isLive);
-  }
-
+  // ── CARD PRICES — fetch all from /prices endpoint ──
+  const PRICES_API = 'https://agent-ash-production.up.railway.app/prices';
   const PRICE_API = 'https://agent-ash-production.up.railway.app/price';
-  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
-  async function fetchPriceFrom(url) {
-    const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_=' + Date.now());
-    if (!res.ok) throw new Error(url + ' → ' + res.status);
-    const data = await res.json();
-    if (!data.price || data.price <= 0) throw new Error(url + ' has no valid price');
-    return data;
-  }
+  async function fetchAllPrices() {
+    try {
+      const res = await fetch(PRICES_API + '?_=' + Date.now());
+      const data = await res.json();
 
-  async function applyCardPrice() {
-    const sources = isLocalhost
-      ? ['price.json', 'default-price.json', PRICE_API]
-      : [PRICE_API, 'default-price.json'];
+      if (data.prices && Object.keys(data.prices).length > 0) {
+        _cardPrices = data.prices;
+        _cardValue = data.total || 0;
 
-    for (const src of sources) {
-      try {
-        const data = await fetchPriceFrom(src);
+        const dateStr = data.updated
+          ? new Date(data.updated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+          : '—';
+        const label = 'Courtyard · ' + dateStr;
 
-        // For local price.json, enforce 24h freshness
-        if (src === 'price.json') {
-          const ageMs = Date.now() - new Date(data.updated).getTime();
-          if (ageMs >= 24 * 60 * 60 * 1000) {
-            console.log('[CardPrice]', src, 'stale (' + Math.round(ageMs/3600000) + 'h), skipping');
-            continue;
-          }
+        // Update collection total
+        document.querySelectorAll('.collection-total-val').forEach(el => {
+          el.textContent = '$' + _cardValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        });
+        const cardMetricSub = document.getElementById('metric-card-sub');
+        if (cardMetricSub) cardMetricSub.textContent = '$' + _cardValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' value';
+
+        document.getElementById('card-last-updated').textContent = label;
+        setLiveIndicator('card-live', true);
+
+        // Update individual card price displays (API cards + Pikachu template)
+        updateCardPriceDisplays();
+        // Update the hardcoded Pikachu template price
+        const pikachuCard = _allApiCards.find(c => isPikachuDreamLeague(c));
+        if (pikachuCard && _cardPrices[pikachuCard.tokenId]?.price) {
+          const pp = _cardPrices[pikachuCard.tokenId].price;
+          document.querySelectorAll('.pikachu-price').forEach(el => {
+            el.textContent = '$' + pp.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+          });
         }
 
-        const dateStr = new Date(data.updated).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-        const label = data.source === 'fallback' ? 'Default · ' + dateStr : 'Courtyard · ' + dateStr;
-        console.log('[CardPrice] Using', src + ':', data.price);
-        setCardPrice(data.price, label, true);
+        // Recalc net worth
+        updateNetWorth(_ethValue);
+
+        console.log('[Prices] Got prices for', Object.keys(_cardPrices).length, 'cards, total $' + _cardValue.toFixed(2));
         return;
-      } catch(e) {
-        console.log('[CardPrice]', src, 'failed:', e.message);
       }
+    } catch(e) {
+      console.warn('[Prices] /prices fetch failed:', e);
     }
 
-    // Final fallback: CONFIG
-    console.log('[CardPrice] All sources failed, using CONFIG:', CONFIG.CARD_PRICE);
-    setCardPrice(CONFIG.CARD_PRICE, 'Updated: ' + CONFIG.CARD_PRICE_UPDATED, true);
+    // Fallback: try legacy /price endpoint for at least the Pikachu
+    try {
+      const res = await fetch(PRICE_API + '?_=' + Date.now());
+      const data = await res.json();
+      if (data.price && data.price > 0) {
+        _cardValue = data.price;
+        document.querySelectorAll('.collection-total-val').forEach(el => {
+          el.textContent = '$' + _cardValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        });
+        setLiveIndicator('card-live', true);
+        updateNetWorth(_ethValue);
+        console.log('[Prices] Fallback /price:', data.price);
+      }
+    } catch(e) {
+      console.warn('[Prices] Fallback failed:', e);
+    }
+  }
+
+  function updateCardPriceDisplays() {
+    // Update price on each rendered card in the grids
+    document.querySelectorAll('.p-card').forEach(cardEl => {
+      const onclick = cardEl.getAttribute('onclick') || '';
+      const match = onclick.match(/openCardDetail\((\d+)\)/);
+      if (!match) return;
+      const idx = parseInt(match[1]);
+      const card = _courtyardCards[idx];
+      if (!card) return;
+      const priceInfo = _cardPrices[card.tokenId];
+      const priceEl = cardEl.querySelector('.p-card-value');
+      if (priceEl && priceInfo && priceInfo.price) {
+        priceEl.textContent = '$' + priceInfo.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        priceEl.style.color = '';
+      }
+    });
+  }
+
+  function getCardPrice(tokenId) {
+    const info = _cardPrices[tokenId];
+    return info && info.price ? info.price : null;
   }
 
   // ── WALLET BALANCE via Base public RPC ──
@@ -1294,14 +1336,14 @@
     try {
       const res = await fetch(COURTYARD_API);
       const data = await res.json();
-      // Filter out the Pikachu Dream League since it's the hardcoded template card
-      const allCards = data.cards || [];
-      _courtyardCards = allCards.filter(c => !isPikachuDreamLeague(c));
-      console.log('[Courtyard] Got', allCards.length, 'cards,', _courtyardCards.length, 'after dedup Pikachu');
+      // Keep all cards for price lookups, but filter Pikachu from display grid
+      _allApiCards = data.cards || [];
+      _courtyardCards = _allApiCards.filter(c => !isPikachuDreamLeague(c));
+      console.log('[Courtyard] Got', _allApiCards.length, 'cards,', _courtyardCards.length, 'after dedup Pikachu');
 
       // Update card counts (+1 for hardcoded Pikachu template)
       const totalCards = 1 + _courtyardCards.length;
-      const graded = _courtyardCards.filter(c => { const p = parseCardAttributes(c); return !p.isSealed; }).length;
+      const graded = 1 + _courtyardCards.filter(c => { const p = parseCardAttributes(c); return !p.isSealed; }).length; // +1 for Pikachu
       const sealed = totalCards - graded;
 
       const countEl = document.getElementById('metric-cards-count');
@@ -1349,10 +1391,10 @@
       gradeHtml = `<div class="p-card-grade">${graderLabel} ${gradeNum}${gradeSuffix ? ' · ' + gradeSuffix : ''}</div>`;
     }
 
+    const cardPrice = getCardPrice(card.tokenId);
     let priceHtml;
-    if (isPikachu) {
-      const livePrice = document.querySelector('.card-price-val')?.textContent || '—';
-      priceHtml = `<div class="p-card-value card-price-val">${livePrice}</div>`;
+    if (cardPrice) {
+      priceHtml = `<div class="p-card-value">$${cardPrice.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>`;
     } else {
       priceHtml = '<div class="p-card-value" style="color:var(--muted)">—</div>';
     }
@@ -1551,9 +1593,6 @@
 
   function updateCollectionTotal(cardVal) {
     _cardValue = cardVal;
-    document.querySelectorAll('.card-price-val').forEach(el => {
-      el.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-    });
     document.querySelectorAll('.collection-total-val').forEach(el => {
       el.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     });
@@ -1571,11 +1610,10 @@
 
   // ── INIT: fetch all live data ──
   fetchEthPrice();
-  applyCardPrice();
   fetchWalletBalance();
   fetchActivity();
   fetchPolygonWallet();
-  fetchCourtyardCards();
+  fetchCourtyardCards().then(() => fetchAllPrices());
   // Refresh ETH price + wallet balance every 60s
   setInterval(fetchEthPrice, 60000);
   setInterval(fetchWalletBalance, 60000);
