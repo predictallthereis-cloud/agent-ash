@@ -449,47 +449,32 @@ app.get('/prices', (req, res) => {
   res.json(cachedPrices);
 });
 
-// ── POLYGON BALANCE (server-side to avoid CORS) ──
-const POLYGON_RPC = 'https://polygon-rpc.com';
+// ── POLYGON BALANCE via PolygonScan API ──
 const POLYGON_WALLET_ADDR = '0x028Edd38341280e3e322D75C09b90E420572d21f';
 const POLYGON_USDC_NATIVE = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
 const POLYGON_USDC_BRIDGED = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'; // USDC.e
 
 app.get('/polygon-balance', async (req, res) => {
-  const addr = POLYGON_WALLET_ADDR.toLowerCase().replace('0x', '');
-  const balanceOfData = '0x70a08231' + addr.padStart(64, '0');
+  const apiKey = process.env.POLYGONSCAN_API_KEY || '';
+  const base = 'https://api.polygonscan.com/api';
 
   try {
     const [polRes, usdcNativeRes, usdcBridgedRes] = await Promise.all([
-      fetch(POLYGON_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_getBalance', params: [POLYGON_WALLET_ADDR, 'latest'], id: 1 }),
-      }),
-      fetch(POLYGON_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: POLYGON_USDC_NATIVE, data: balanceOfData }, 'latest'], id: 2 }),
-      }),
-      fetch(POLYGON_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: POLYGON_USDC_BRIDGED, data: balanceOfData }, 'latest'], id: 3 }),
-      }),
+      fetch(`${base}?module=account&action=balance&address=${POLYGON_WALLET_ADDR}&tag=latest&apikey=${apiKey}`),
+      fetch(`${base}?module=account&action=tokenbalance&contractaddress=${POLYGON_USDC_NATIVE}&address=${POLYGON_WALLET_ADDR}&tag=latest&apikey=${apiKey}`),
+      fetch(`${base}?module=account&action=tokenbalance&contractaddress=${POLYGON_USDC_BRIDGED}&address=${POLYGON_WALLET_ADDR}&tag=latest&apikey=${apiKey}`),
     ]);
 
     const polData = await polRes.json();
     const usdcNativeData = await usdcNativeRes.json();
     const usdcBridgedData = await usdcBridgedRes.json();
 
-    const polWei = BigInt(polData.result || '0x0');
-    const polBal = Number(polWei) / 1e18;
-
-    const usdcNative = Number(BigInt(usdcNativeData.result || '0x0')) / 1e6;
-    const usdcBridged = Number(BigInt(usdcBridgedData.result || '0x0')) / 1e6;
+    const polBal = Number(BigInt(polData.result || '0')) / 1e18;
+    const usdcNative = Number(BigInt(usdcNativeData.result || '0')) / 1e6;
+    const usdcBridged = Number(BigInt(usdcBridgedData.result || '0')) / 1e6;
     const usdcBal = usdcNative + usdcBridged;
 
-    console.log(`[polygon] POL: ${polBal.toFixed(4)}, USDC native: ${usdcNative.toFixed(2)}, USDC.e: ${usdcBridged.toFixed(2)}, total: ${usdcBal.toFixed(2)}`);
+    console.log(`[polygon] POL: ${polBal.toFixed(18)}, USDC native: ${usdcNative.toFixed(6)}, USDC.e: ${usdcBridged.toFixed(6)}, total: ${usdcBal.toFixed(6)}`);
     res.json({ pol: polBal, usdc: usdcBal, usdcNative, usdcBridged, updated: new Date().toISOString() });
   } catch (err) {
     console.error('[polygon] Balance fetch failed:', err.message);
