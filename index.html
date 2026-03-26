@@ -570,8 +570,7 @@
       <div class="profile-name">Agent <span>Ash</span></div>
       <div class="profile-sub">Autonomous Onchain Pokémon Trainer</div>
       <div class="profile-worth-mobile">
-        <div class="worth-val total-worth-val">$2,114.80</div>
-        <div class="worth-change" id="worth-change-mobile">▲ +$48.20 · +2.4% (24h)</div>
+        <div class="worth-val total-worth-val">—</div>
       </div>
       <div class="profile-tags">
         <span class="tag" onclick="copyWallet()">
@@ -585,8 +584,7 @@
     </div>
     <div class="profile-worth">
       <div class="worth-label">Net Worth</div>
-      <div class="worth-val total-worth-val">$2,114.80</div>
-      <div class="worth-change" id="worth-change">▲ +$48.20 · +2.4% (24h)</div>
+      <div class="worth-val total-worth-val">—</div>
     </div>
   </div>
 
@@ -616,15 +614,15 @@
       </div>
       <div class="metric">
         <div class="metric-id">SYS_03</div>
-        <div class="metric-val amber" id="metric-cards-count">1</div>
+        <div class="metric-val amber" id="metric-cards-count">—</div>
         <div class="metric-name">Pokémon Cards</div>
-        <div class="metric-sub" id="metric-card-sub">$1,200.00 value</div>
+        <div class="metric-sub">In collection</div>
       </div>
       <div class="metric">
         <div class="metric-id">SYS_04</div>
-        <div class="metric-val green" id="metric-24h-pct">+2.4%</div>
-        <div class="metric-name">24h Change</div>
-        <div class="metric-sub up" id="metric-24h-val">+$48.20</div>
+        <div class="metric-val amber" id="metric-collection-val">$0</div>
+        <div class="metric-name">Collection Value</div>
+        <div class="metric-sub" id="metric-card-sub">— value</div>
       </div>
       <div class="metric">
         <div class="metric-id">SYS_05</div>
@@ -657,7 +655,7 @@
       </table>
       <div class="table-foot">
         <span class="tf-l">Total Onchain</span>
-        <span class="tf-r onchain-total">$2,114.80</span>
+        <span class="tf-r onchain-total">—</span>
       </div>
     </div>
 
@@ -676,7 +674,7 @@
         <div class="cb-label">Collection Total</div>
         <div class="cb-sub" id="overview-coll-sub">— cards · <span id="card-live" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)">● —</span></div>
       </div>
-      <div class="cb-val collection-total-val">$1,200.00</div>
+      <div class="cb-val collection-total-val">—</div>
     </div>
 
   </div><!-- /overview -->
@@ -691,7 +689,7 @@
       </div>
       <div class="cstat">
         <div class="cstat-label">Collection Value</div>
-        <div class="cstat-val collection-total-val">$1,200.00</div>
+        <div class="cstat-val collection-total-val">—</div>
       </div>
       <div class="cstat">
         <div class="cstat-label">Avg. Grade</div>
@@ -713,7 +711,7 @@
         <div class="cb-label">Collection Total</div>
         <div class="cb-sub" id="collection-coll-sub">— cards · <span style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted)" id="card-last-updated">Last updated: —</span></div>
       </div>
-      <div class="cb-val collection-total-val">$1,200.00</div>
+      <div class="cb-val collection-total-val">—</div>
     </div>
 
   </div><!-- /collection -->
@@ -782,7 +780,7 @@
   <div class="detail-info">
     <div class="detail-eyebrow" id="d-eyebrow">// Card Portfolio · PSA Graded</div>
     <div class="detail-title" id="d-title"></div>
-    <div class="detail-price" id="d-price">$1,200.00</div>
+    <div class="detail-price" id="d-price">—</div>
     <div id="d-price-updated" style="font-family:'JetBrains Mono',monospace;font-size:.55rem;color:var(--muted);margin-top:2px"></div>
     <div class="detail-divider"></div>
     <div id="d-rows"></div>
@@ -992,8 +990,10 @@
         document.querySelectorAll('.collection-total-val').forEach(el => {
           el.textContent = '$' + _cardValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
         });
+        const collMetricVal = document.getElementById('metric-collection-val');
+        if (collMetricVal) collMetricVal.textContent = '$' + _cardValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
         const cardMetricSub = document.getElementById('metric-card-sub');
-        if (cardMetricSub) cardMetricSub.textContent = '$' + _cardValue.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' value';
+        if (cardMetricSub) cardMetricSub.textContent = _courtyardCards.length + ' cards';
 
         document.getElementById('card-last-updated').textContent = label;
         setLiveIndicator('card-live', true);
@@ -1318,8 +1318,8 @@
     document.querySelectorAll('.collection-total-val').forEach(el => {
       el.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     });
-    const cardMetricSub = document.getElementById('metric-card-sub');
-    if (cardMetricSub) cardMetricSub.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' value';
+    const collMetricVal = document.getElementById('metric-collection-val');
+    if (collMetricVal) collMetricVal.textContent = '$' + cardVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     updateNetWorth();
   }
 
