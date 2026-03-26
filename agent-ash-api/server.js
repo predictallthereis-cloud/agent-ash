@@ -497,13 +497,16 @@ async function refreshActivity() {
       const nfts = nftByHash[hash];
       const erc20s = erc20ByHash[hash] || [];
 
-      // Find USDC transfers in this tx
-      const usdcTxs = erc20s.filter(t => USDC_ADDRS.has(t.contractAddress.toLowerCase()));
+      // Find USDC transfers in this tx (only actual USDC, filter spam)
+      const usdcTxs = erc20s.filter(t =>
+        USDC_ADDRS.has(t.contractAddress.toLowerCase()) &&
+        (t.tokenSymbol || '').toUpperCase().includes('USDC')
+      );
       let usdcAmount = 0;
       let usdcDirection = null;
       for (const ut of usdcTxs) {
         const amt = parseInt(ut.value || '0') / 1e6;
-        if (amt > 0) {
+        if (amt >= 0.01) {
           usdcAmount += amt;
           usdcDirection = ut.from.toLowerCase() === wallet ? 'out' : 'in';
         }
@@ -513,7 +516,8 @@ async function refreshActivity() {
         const nftToUs = nft.to.toLowerCase() === wallet;
         const nftFromZero = nft.from.toLowerCase() === '0x0000000000000000000000000000000000000000';
         const tokenId = nft.tokenID;
-        const cardName = cardNames[tokenId] || nft.tokenName || `Token #${tokenId}`;
+        // Try cached card name first, then Etherscan tokenName, then truncated ID
+        const cardName = cardNames[tokenId] || nft.tokenName || `#${tokenId.slice(0, 8)}...`;
 
         let type;
         if (nftToUs && usdcAmount > 0 && usdcDirection === 'out') {
@@ -528,12 +532,15 @@ async function refreshActivity() {
 
         const counterparty = nftToUs ? nft.from : nft.to;
 
+        // Direction reflects USDC flow: out = we spent money, in = we received money
+        const direction = usdcAmount > 0 ? usdcDirection : (nftToUs ? 'in' : 'out');
+
         activity.push({
           type,
           cardName,
           tokenId,
           amount: usdcAmount > 0 ? usdcAmount : null,
-          direction: nftToUs ? 'in' : 'out',
+          direction,
           hash: nft.hash,
           counterparty,
           timestamp: parseInt(nft.timeStamp || '0'),
@@ -541,15 +548,16 @@ async function refreshActivity() {
       }
     }
 
-    // Process standalone ERC-20 transfers (no matching NFT)
+    // Process standalone ERC-20 transfers (no matching NFT, USDC only, skip spam)
     for (const hash of Object.keys(erc20ByHash)) {
       if (processedHashes.has(hash)) continue;
       const erc20s = erc20ByHash[hash];
 
       for (const tx of erc20s) {
         if (!USDC_ADDRS.has(tx.contractAddress.toLowerCase())) continue;
+        if (!(tx.tokenSymbol || '').toUpperCase().includes('USDC')) continue;
         const amt = parseInt(tx.value || '0') / 1e6;
-        if (amt <= 0) continue;
+        if (amt < 0.01) continue;
 
         const isOut = tx.from.toLowerCase() === wallet;
         activity.push({

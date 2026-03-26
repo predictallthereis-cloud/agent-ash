@@ -1225,37 +1225,37 @@
         const label = ACT_LABELS[tx.type] || 'Transfer';
 
         const shortName = tx.cardName ? tx.cardName.replace(/^Courtyard\s*/i, '').slice(0, 55) : null;
-        const hashShort = tx.hash.slice(0, 6) + '...' + tx.hash.slice(-4);
         const cpShort = tx.counterparty ? tx.counterparty.slice(0, 6) + '...' + tx.counterparty.slice(-4) : '';
 
-        // Title line
-        let title = label;
-        let subtitle = '';
+        // Title: type label + context
+        const via = (tx.type === 'trade' || tx.type === 'mint') ? ' · via Courtyard.io' : '';
+        let descLine = '';
         if (shortName) {
-          subtitle = shortName;
-        } else if (tx.amount) {
-          subtitle = '$' + tx.amount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' USDC';
+          descLine = `<div style="font-size:.75rem;color:var(--mid);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px">${shortName}</div>`;
+        } else if (tx.amount && !tx.cardName) {
+          descLine = `<div style="font-size:.75rem;color:var(--mid);margin-top:2px">${tx.amount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})} USDC</div>`;
         }
 
-        // Amount display
+        // Amount display — direction from backend (out = red, in = green)
         let amountHtml = '';
         if (tx.amount) {
-          const isMoneyIn = tx.direction === 'in';
-          const sign = isMoneyIn ? '+' : '−';
-          const cls = isMoneyIn ? 'green' : 'red';
+          const isOut = tx.direction === 'out';
+          const sign = isOut ? '−' : '+';
+          const cls = isOut ? 'red' : 'green';
           amountHtml = `<div class="act-amount ${cls}">${sign}$${tx.amount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>`;
         } else {
-          amountHtml = `<div class="act-amount amber">${label}</div>`;
+          amountHtml = `<div class="act-amount" style="color:var(--muted);font-size:.75rem">${label}</div>`;
         }
 
         html += `<div class="act-item" data-type="${tx.type}">
           <div class="act-icon ${iconClass}">${icon}</div>
           <div class="act-body">
-            <div class="act-title">${title}${subtitle ? ' — ' + subtitle : ''}</div>
+            <div class="act-title">${label}${via}</div>
+            ${descLine}
             <div class="act-meta">
-              ${cpShort} &nbsp;·&nbsp; ${timeStr} &nbsp;·&nbsp;
-              <a href="https://polygonscan.com/tx/${tx.hash}" target="_blank" class="act-hash">
-                ${hashShort} ${linkSvg}
+              ${cpShort} · ${timeStr}
+              <a href="https://polygonscan.com/tx/${tx.hash}" target="_blank" class="act-hash" style="margin-left:6px">
+                ${linkSvg}
               </a>
             </div>
           </div>
